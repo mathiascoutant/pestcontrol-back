@@ -2,10 +2,10 @@ import { Sequelize } from "sequelize";
 // Configuration de la connexion à la base de données
 const sequelize = new Sequelize({
   dialect: "mysql",
-  host: "sql7.freesqldatabase.com",
-  username: "sql7757369",
-  password: "gZfzpZcU2i",
-  database: "sql7757369",
+  host: "37.187.225.41",
+  username: "admin",
+  password: "PestControl33",
+  database: "pestcontrol",
   logging: false,
   port: 3306,
   pool: {
@@ -37,8 +37,8 @@ const checkDatabaseConnection = async () => {
   }
 };
 
-// Vérifier la connexion toutes les 5 minutes
-setInterval(checkDatabaseConnection, 5 * 60 * 1000);
+// Vérifier la connexion toutes les 60 minutes
+setInterval(checkDatabaseConnection, 69 * 60 * 1000);
 
 // Vérifier la connexion au démarrage
 checkDatabaseConnection();
