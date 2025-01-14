@@ -11,8 +11,12 @@ import Favorite from "../models/favoritesModel.js";
 import Discount from "../models/discountModel.js";
 import { Op } from "sequelize";
 import multer from "multer";
-import { uploadFile } from "../services/uploadService.js";
 import { MEDIA_CONFIG } from "../config/mediaConfig.js";
+import {
+  connectSFTP,
+  uploadFileToVPS,
+  disconnectSFTP,
+} from "../services/uploadService.js";
 
 const storage = multer.memoryStorage();
 const uploadMiddleware = multer({
@@ -34,7 +38,6 @@ const uploadMiddleware = multer({
 });
 
 export const handleUpload = (req, res, next) => {
-  // Utiliser .any() pour accepter tous les champs
   uploadMiddleware.any()(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       return res
@@ -63,25 +66,29 @@ export const addProduct = async (req, res) => {
   try {
     const { nom, description, stock, status, prix } = req.body;
 
-    if (!nom || !description || !stock || !status || !prix) {
-      return res
-        .status(400)
-        .json({ message: "Tous les champs sont obligatoires." });
+    const formattedPrix = parseFloat(prix.replace(",", "."));
+
+    if (!nom || !description || !stock || !status || isNaN(formattedPrix)) {
+      return res.status(400).json({
+        message:
+          "Tous les champs sont obligatoires et le prix doit être un nombre valide.",
+      });
     }
 
     if (!req.files || req.files.length === 0) {
       return res
         .status(400)
-        .json({ message: "Vous devez fournir au moins une image." });
+        .json({ message: "Vous devez fournir au moins un fichier." });
     }
 
+    // Vérifier qu'il y a au moins une image
     const imageFiles = req.files.filter((file) =>
       file.mimetype.startsWith("image/")
     );
     if (imageFiles.length === 0) {
       return res
         .status(400)
-        .json({ message: "Vous devez fournir au moins une image valide." });
+        .json({ message: "Vous devez fournir au moins une image." });
     }
 
     const existingProduct = await Product.findOne({ where: { nom } });
@@ -96,7 +103,7 @@ export const addProduct = async (req, res) => {
       description,
       stock,
       status,
-      prix,
+      prix: formattedPrix,
       favorites: 0,
       medias: {
         imageUrls: [],
@@ -109,31 +116,39 @@ export const addProduct = async (req, res) => {
       videoUrls: [],
     };
 
-    if (req.files && req.files.length > 0) {
-      const mediaFiles = req.files.filter(
-        (file) => file.fieldname === "@media"
+    await connectSFTP();
+
+    for (let i = 0; i < req.files.length; i++) {
+      const mediaFile = req.files[i];
+      const mediaResult = await uploadFileToVPS(
+        mediaFile,
+        newProduct.id,
+        i + 1
       );
 
-      for (let i = 0; i < mediaFiles.length; i++) {
-        const mediaFile = mediaFiles[i];
+      if (mediaResult.success) {
         const isImage = mediaFile.mimetype.startsWith("image/");
+        const isVideo = mediaFile.mimetype.startsWith("video/");
 
-        const mediaResult = await uploadFile(mediaFile, newProduct.id, i + 1);
-
-        if (mediaResult.success) {
-          const baseUrl = `${MEDIA_CONFIG.BASE_URL}`;
-          if (isImage) {
-            mediaUrls.imageUrls.push(
-              `${baseUrl}/media/images/${mediaResult.filename}`
-            );
-          } else {
-            mediaUrls.videoUrls.push(
-              `${baseUrl}/media/videos/${mediaResult.filename}`
-            );
-          }
+        const baseUrl = `${MEDIA_CONFIG.BASE_URL}`;
+        if (isImage) {
+          mediaUrls.imageUrls.push(
+            `${baseUrl}/medias/IMAGES/${mediaResult.filename}`
+          );
+        } else if (isVideo) {
+          mediaUrls.videoUrls.push(
+            `${baseUrl}/medias/VIDEOS/${mediaResult.filename}`
+          );
         }
+      } else {
+        console.error(
+          "Erreur lors de l'upload du fichier :",
+          mediaResult.message
+        );
       }
     }
+
+    await disconnectSFTP();
 
     await newProduct.update({ medias: mediaUrls });
 
