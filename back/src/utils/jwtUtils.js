@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET =
+  "f3c1e2d3b4a5c6d7e8f9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1";
 
 const generateToken = (payload) => {
   return jwt.sign(payload, JWT_SECRET, {
