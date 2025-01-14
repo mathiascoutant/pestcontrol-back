@@ -1,5 +1,5 @@
 export const MEDIA_CONFIG = {
-  BASE_URL: "https://pestcontrol33.com",
+  BASE_URL: "http://37.187.225.41",
   PATHS: {
     IMAGES: "/media",
     VIDEOS: "/media",
