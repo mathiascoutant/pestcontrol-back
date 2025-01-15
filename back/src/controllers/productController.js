@@ -292,6 +292,7 @@ export const fetchProduct = async (req, res) => {
       stock: product.stock,
       status: product.status,
       prix: product.prix,
+      conseilsUtilisation: product.conseilsUtilisation,
       newPrice: discountInfo.newPrice || null,
       discount: discountInfo.discount || null,
       like: like,
