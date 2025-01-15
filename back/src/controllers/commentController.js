@@ -45,6 +45,10 @@ export const addComment = async (req, res) => {
   }
 };
 
+const roundToHalf = (value) => {
+  return Math.ceil(value * 2) / 2;
+};
+
 export const getAllCommentsByProductId = async (req, res) => {
   const { productId } = req.params;
 
@@ -61,6 +65,17 @@ export const getAllCommentsByProductId = async (req, res) => {
         .json({ message: "Aucun commentaire trouvé pour ce produit." });
     }
 
+    // Calculer la moyenne des notations
+    const ratings = comments.map((comment) => comment.notation); // Supposons que chaque commentaire a une propriété 'notation'
+    const averageRating =
+      ratings.length > 0
+        ? ratings.reduce((acc, curr) => acc + curr, 0) / ratings.length
+        : null;
+
+    // Arrondir la moyenne à 0,5 ou à l'entier supérieur
+    const roundedAverageRating =
+      averageRating !== null ? roundToHalf(averageRating) : null;
+
     const commentsWithUserInfo = await Promise.all(
       comments.map(async (comment) => {
         const user = await User.findByPk(comment.userId, {
@@ -73,7 +88,12 @@ export const getAllCommentsByProductId = async (req, res) => {
       })
     );
 
-    return res.status(200).json(commentsWithUserInfo);
+    // Inclure la moyenne des notations et le nombre de commentaires dans la réponse
+    return res.status(200).json({
+      averageRating: roundedAverageRating, // Ajouter la moyenne arrondie
+      commentCount: comments.length, // Nombre de commentaires
+      comments: commentsWithUserInfo, // Inclure les commentaires avec les informations utilisateur
+    });
   } catch (error) {
     if (error.message === "Produit non trouvé.") {
       return res.status(404).json({ message: error.message });
