@@ -21,7 +21,17 @@ export const updateUser = async (req, res) => {
     const decoded = verifyToken(token);
     const userId = decoded.userId;
 
-    const { nom, prenom, pseudo, email } = req.body;
+    const {
+      nom,
+      prenom,
+      pseudo,
+      email,
+      codePostale,
+      ville,
+      pays,
+      adresse,
+      telephone,
+    } = req.body;
 
     const currentUser = await UserService.getUserById(userId);
     if (!currentUser)
@@ -59,6 +69,27 @@ export const updateUser = async (req, res) => {
       hasChanges = true;
     }
 
+    if (codePostale !== undefined) {
+      updatedFields.codePostale = codePostale || null;
+      hasChanges = true;
+    }
+    if (ville !== undefined) {
+      updatedFields.ville = ville || null;
+      hasChanges = true;
+    }
+    if (pays !== undefined) {
+      updatedFields.pays = pays || null;
+      hasChanges = true;
+    }
+    if (adresse !== undefined) {
+      updatedFields.adresse = adresse || null;
+      hasChanges = true;
+    }
+    if (telephone !== undefined) {
+      updatedFields.telephone = telephone || null;
+      hasChanges = true;
+    }
+
     if (!hasChanges) {
       return res.status(200).json([]);
     }
@@ -67,7 +98,6 @@ export const updateUser = async (req, res) => {
 
     const updatedUser = await UserService.getUserById(userId);
 
-    // Formater la réponse
     const responseUser = {
       nom: updatedUser.nom,
       prenom: updatedUser.prenom,
@@ -75,6 +105,11 @@ export const updateUser = async (req, res) => {
       email: updatedUser.email,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt,
+      telephone: updatedUser.telephone,
+      adresse: updatedUser.adresse,
+      ville: updatedUser.ville,
+      codePostale: updatedUser.codePostale,
+      pays: updatedUser.pays,
     };
 
     return res.status(200).json({

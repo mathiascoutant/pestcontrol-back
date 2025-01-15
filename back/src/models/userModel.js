@@ -53,9 +53,29 @@ const User = sequelize.define(
         },
       },
     },
+    telephone: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     admin: {
       type: DataTypes.INTEGER,
       allowNull: false,
+    },
+    adresse: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    ville: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    codePostale: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    pays: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {

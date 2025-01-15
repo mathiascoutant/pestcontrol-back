@@ -11,21 +11,21 @@ export const connectSFTP = async () => {
   });
 };
 
-export const uploadFileToVPS = async (file, productId, index) => {
-  const mediaType = file.mimetype.startsWith("image/") ? "IMAGES" : "VIDEOS";
-
+export const uploadFileToVPS = async (file, Id, index, type, destination) => {
   // Générer un identifiant aléatoire
-  const randomIdBefore = Math.floor(10000000 + Math.random() * 90000000); // Génère un nombre aléatoire à 8 chiffres
-  const randomIdAfter = Math.floor(100000 + Math.random() * 900000); // Génère un nombre aléatoire à 6 chiffres
+  const randomIdBefore = Math.floor(10000000 + Math.random() * 90000000);
+  const randomIdAfter = Math.floor(100000 + Math.random() * 900000);
 
   const extension = file.originalname.split(".").pop();
 
-  const newFileName = `${randomIdBefore}_${productId}_${index}_${randomIdAfter}.${extension}`;
-  const remotePath = `/var/www/medias/${mediaType}/${newFileName}`;
+  const remotePath = `/var/www/medias/${type}/${destination}/${randomIdBefore}_${Id}_${index}_${randomIdAfter}.${extension}`; // Chemin distant
 
   try {
     await sftp.put(file.buffer, remotePath);
-    return { success: true, filename: newFileName };
+    return {
+      success: true,
+      filename: `${randomIdBefore}_${Id}_${index}_${randomIdAfter}.${extension}`,
+    };
   } catch (err) {
     return { success: false, message: err.message };
   }

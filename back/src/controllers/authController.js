@@ -4,6 +4,7 @@ import { Op } from "sequelize";
 import mongoose from "mongoose";
 import { comparePassword, hashPassword } from "../utils/passwordUtils.js";
 import { JWT_SECRET, generateToken } from "../utils/jwtUtils.js";
+import { template } from "@babel/core";
 
 export const register = async (req, res) => {
   try {
@@ -38,6 +39,11 @@ export const register = async (req, res) => {
       pseudo,
       email,
       password: createdPassword,
+      telephone: null,
+      adresse: null,
+      ville: null,
+      codePostale: null,
+      pays: null,
       admin: 0,
     });
 

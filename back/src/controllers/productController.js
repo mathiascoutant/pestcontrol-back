@@ -40,6 +40,7 @@ const uploadMiddleware = multer({
 export const handleUpload = (req, res, next) => {
   uploadMiddleware.any()(req, res, (err) => {
     if (err instanceof multer.MulterError) {
+      console.log("test");
       return res
         .status(400)
         .json({ message: `Erreur d'upload: ${err.message}` });
@@ -120,25 +121,24 @@ export const addProduct = async (req, res) => {
 
     for (let i = 0; i < req.files.length; i++) {
       const mediaFile = req.files[i];
+      let mediaType = mediaFile.mimetype.startsWith("image/")
+        ? "images"
+        : "videos";
+
       const mediaResult = await uploadFileToVPS(
         mediaFile,
         newProduct.id,
-        i + 1
+        i + 1,
+        mediaType,
+        "products"
       );
 
       if (mediaResult.success) {
-        const isImage = mediaFile.mimetype.startsWith("image/");
-        const isVideo = mediaFile.mimetype.startsWith("video/");
-
-        const baseUrl = `${MEDIA_CONFIG.BASE_URL}`;
-        if (isImage) {
-          mediaUrls.imageUrls.push(
-            `${baseUrl}/medias/IMAGES/${mediaResult.filename}`
-          );
-        } else if (isVideo) {
-          mediaUrls.videoUrls.push(
-            `${baseUrl}/medias/VIDEOS/${mediaResult.filename}`
-          );
+        const baseUrl = `http://37.187.225.41/medias/${mediaType}/products`;
+        if (mediaType === "images") {
+          mediaUrls.imageUrls.push(`${baseUrl}/${mediaResult.filename}`);
+        } else if (mediaType === "videos") {
+          mediaUrls.videoUrls.push(`${baseUrl}/${mediaResult.filename}`);
         }
       } else {
         console.error(
