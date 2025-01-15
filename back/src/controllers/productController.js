@@ -65,11 +65,17 @@ export const addProduct = async (req, res) => {
   }
 
   try {
-    const { nom, description, stock, status, prix } = req.body;
+    const { nom, description, stock, prix, conseilsUtilisation } = req.body;
 
     const formattedPrix = parseFloat(prix.replace(",", "."));
 
-    if (!nom || !description || !stock || !status || isNaN(formattedPrix)) {
+    if (
+      !nom ||
+      !description ||
+      !stock ||
+      !conseilsUtilisation ||
+      isNaN(formattedPrix)
+    ) {
       return res.status(400).json({
         message:
           "Tous les champs sont obligatoires et le prix doit être un nombre valide.",
@@ -103,9 +109,10 @@ export const addProduct = async (req, res) => {
       nom,
       description,
       stock,
-      status,
+      status: 1,
       prix: formattedPrix,
       favorites: 0,
+      conseilsUtilisation,
       medias: {
         imageUrls: [],
         videoUrls: [],
@@ -200,7 +207,7 @@ export const fetchAllProducts = async (req, res) => {
     let likedProductIds = new Set();
     if (userId) {
       const userFavorites = await Favorite.findAll({
-        where: { userId: userId },
+        where: { userId: userId, status: 1 },
       });
 
       likedProductIds = new Set(
