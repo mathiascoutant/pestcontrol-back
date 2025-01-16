@@ -8,12 +8,14 @@ import {
   likeProduct,
   unlikeProduct,
   handleUpload,
+  getAllFavoritesByUserId,
 } from "../controllers/productController.js";
 
 const router = express.Router();
 
 // Routes pour les produits
 router.post("/add", handleUpload, addProduct);
+router.get("/likes", getAllFavoritesByUserId);
 router.get("/", fetchAllProducts);
 router.get("/:id", fetchProduct);
 router.put("/:id", updateProduct);

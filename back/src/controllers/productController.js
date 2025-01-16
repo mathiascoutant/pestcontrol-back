@@ -187,7 +187,10 @@ export const fetchAllProducts = async (req, res) => {
 
     const products = await getAllProducts();
 
-    const productIds = products.map((product) => product.id);
+    // Filtrer les produits pour ne garder que ceux avec un statut de 1
+    const filteredProducts = products.filter((product) => product.status === 1);
+
+    const productIds = filteredProducts.map((product) => product.id);
 
     const discounts = await Discount.findAll({
       where: {
@@ -206,8 +209,9 @@ export const fetchAllProducts = async (req, res) => {
 
     let likedProductIds = new Set();
     if (userId) {
+      // Récupérer les favoris de l'utilisateur
       const userFavorites = await Favorite.findAll({
-        where: { userId: userId, status: 1 },
+        where: { userId: userId },
       });
 
       likedProductIds = new Set(
@@ -215,17 +219,17 @@ export const fetchAllProducts = async (req, res) => {
       );
     }
 
-    const productsWithLikes = products.map((product) => {
+    const productsWithLikes = filteredProducts.map((product) => {
       const discountInfo = discountMap[product.id] || {};
       const productData = {
         ...product.toJSON(),
         newPrice: discountInfo.newPrice || null,
         discount: discountInfo.discount || null,
-        like: likedProductIds.has(product.id) ? 1 : 0,
+        liked: likedProductIds.has(product.id) ? 1 : 0, // Utiliser 'liked' au lieu de 'like'
       };
 
       if (!isAdmin) {
-        delete productData.favorites;
+        delete productData.favorites; // Supprimer les informations de favoris pour les non-admins
       }
 
       return productData;
@@ -490,5 +494,53 @@ export const unlikeProduct = async (req, res) => {
       message: "Erreur serveur lors du retrait des favoris",
       error: error.message,
     });
+  }
+};
+
+export const getAllFavoritesByUserId = async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Token manquant." });
+  }
+
+  const verified = verifyToken(token);
+
+  if (!verified) {
+    return res.status(401).json({ message: "Token invalide." });
+  }
+
+  const userId = verified.userId;
+
+  try {
+    // Récupérer tous les favoris de l'utilisateur
+    const favorites = await Favorite.findAll({ where: { userId } });
+
+    if (!favorites || favorites.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Aucun favori trouvé pour cet utilisateur." });
+    }
+
+    // Récupérer les informations des produits associés aux favoris
+    const products = await Promise.all(
+      favorites.map(async (favorite) => {
+        const product = await Product.findByPk(favorite.productId);
+        if (!product) {
+          console.warn(`Produit non trouvé pour l'ID: ${favorite.productId}`); // Log pour le débogage
+          return null; // Retourner null si le produit n'est pas trouvé
+        }
+        return product.toJSON(); // Convertir le produit en JSON
+      })
+    );
+
+    // Filtrer les produits non trouvés
+    const filteredProducts = products.filter((product) => product !== null);
+
+    return res.status(200).json({
+      favorites: filteredProducts, // Retourner les produits associés aux favoris
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
