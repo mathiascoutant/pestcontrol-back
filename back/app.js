@@ -8,6 +8,7 @@ import shoppingRoutes from "./src/routes/shoppingRoutes.js";
 import discountRoutes from "./src/routes/discountRoutes.js";
 import commentRoutes from "./src/routes/commentRoutes.js";
 import subCategoriesRoutes from "./src/routes/subCategoriesRoutes.js";
+import paymentRoutes from "./src/routes/paymentRoutes.js";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use(`/${api}/shopping`, shoppingRoutes);
 app.use(`/${api}/discount`, discountRoutes);
 app.use(`/${api}/comment`, commentRoutes);
 app.use(`/${api}/subCategories`, subCategoriesRoutes);
+app.use(`/${api}/payments`, paymentRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res) => {

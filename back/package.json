@@ -17,8 +17,9 @@
   "author": "Votre Nom",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.7.7",
+    "axios": "^1.7.9",
     "bcrypt": "^5.0.1",
+    "cheerio": "^1.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
@@ -28,8 +29,10 @@
     "multer": "^1.4.4",
     "mysql2": "^2.3.3",
     "pg": "^8.13.1",
+    "puppeteer": "^24.1.0",
     "sequelize": "^6.0.0",
-    "ssh2-sftp-client": "^11.0.0"
+    "ssh2-sftp-client": "^11.0.0",
+    "stripe": "^17.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",

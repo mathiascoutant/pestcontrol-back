@@ -1,6 +1,7 @@
 import { verifyToken } from "../utils/jwtUtils.js";
 import * as commentService from "../services/commentService.js";
 import User from "../models/userModel.js";
+import puppeteer from "puppeteer";
 
 export const addComment = async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -88,11 +89,10 @@ export const getAllCommentsByProductId = async (req, res) => {
       })
     );
 
-    // Inclure la moyenne des notations et le nombre de commentaires dans la réponse
     return res.status(200).json({
-      averageRating: roundedAverageRating, // Ajouter la moyenne arrondie
-      commentCount: comments.length, // Nombre de commentaires
-      comments: commentsWithUserInfo, // Inclure les commentaires avec les informations utilisateur
+      averageRating: roundedAverageRating,
+      commentCount: comments.length,
+      comments: commentsWithUserInfo,
     });
   } catch (error) {
     if (error.message === "Produit non trouvé.") {
