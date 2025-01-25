@@ -1,4 +1,4 @@
-import Discount from "../models/discountModel.js";
+import Discount from "../models/discountProductsModel.js";
 import Product from "../models/productModel.js";
 
 export const createDiscount = async ({
@@ -51,8 +51,7 @@ export const updateDiscount = async ({
 };
 
 export const deleteDiscount = async (discountId) => {
-
-    const existingDiscount = await Discount.findByPk(discountId);
+  const existingDiscount = await Discount.findByPk(discountId);
   if (!existingDiscount) {
     throw new Error("Discount non trouvé.");
   }

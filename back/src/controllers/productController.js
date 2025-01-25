@@ -8,7 +8,7 @@ import {
 import Product from "../models/productModel.js";
 import { verifyToken } from "../utils/jwtUtils.js";
 import Favorite from "../models/favoritesModel.js";
-import Discount from "../models/discountModel.js";
+import Discount from "../models/discountProductsModel.js";
 import { Op } from "sequelize";
 import multer from "multer";
 import { MEDIA_CONFIG } from "../config/mediaConfig.js";
@@ -16,7 +16,12 @@ import {
   connectSFTP,
   uploadFileToVPS,
   disconnectSFTP,
+  deleteFileToVPS,
 } from "../services/uploadService.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { promisify } from "util";
 
 const storage = multer.memoryStorage();
 const uploadMiddleware = multer({
@@ -25,7 +30,6 @@ const uploadMiddleware = multer({
     fileSize: MEDIA_CONFIG.MAX_FILE_SIZE,
   },
   fileFilter: (req, file, cb) => {
-    // Vérifier si le fichier est une image ou une vidéo
     const isImage = file.mimetype.startsWith("image/");
     const isVideo = file.mimetype.startsWith("video/");
 
@@ -36,6 +40,11 @@ const uploadMiddleware = multer({
     }
   },
 });
+
+const unlink = promisify(fs.unlink);
+const exists = promisify(fs.exists);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const handleUpload = (req, res, next) => {
   uploadMiddleware.any()(req, res, (err) => {
@@ -187,7 +196,6 @@ export const fetchAllProducts = async (req, res) => {
 
     const products = await getAllProducts();
 
-    // Filtrer les produits pour ne garder que ceux avec un statut de 1
     const filteredProducts = products.filter((product) => product.status === 1);
 
     const productIds = filteredProducts.map((product) => product.id);
@@ -225,11 +233,11 @@ export const fetchAllProducts = async (req, res) => {
         ...product.toJSON(),
         newPrice: discountInfo.newPrice || null,
         discount: discountInfo.discount || null,
-        liked: likedProductIds.has(product.id) ? 1 : 0, // Utiliser 'liked' au lieu de 'like'
+        liked: likedProductIds.has(product.id) ? 1 : 0,
       };
 
       if (!isAdmin) {
-        delete productData.favorites; // Supprimer les informations de favoris pour les non-admins
+        delete productData.favorites;
       }
 
       return productData;
@@ -369,27 +377,70 @@ export const deleteProduct = async (req, res) => {
 
   if (verified.admin != 1) {
     return res.status(403).json({
-      message: "Vous n'avez pas l'autorisation pour créer un atricle",
+      message: "Vous n'avez pas l'autorisation pour supprimer un produit",
     });
   }
 
   try {
     const productId = req.params.id;
 
-    const existingProduct = await getProductById(productId);
+    const existingProduct = await Product.findById(productId);
     if (!existingProduct) {
       return res.status(404).json({ message: "Produit non trouvé" });
     }
 
-    await deleteProductService(productId);
+    const medias = existingProduct.medias;
+    const mediaUrls = [...medias.imageUrls, ...medias.videoUrls];
 
-    return res.status(200).json({ message: "Produit supprimé avec succès" });
+    await connectSFTP();
+
+    for (const mediaUrl of mediaUrls) {
+      try {
+        const filename = mediaUrl.split("/").pop();
+
+        const mediaType = mediaUrl.includes("/images/") ? "images" : "videos";
+
+        const filePath = `/var/www/medias/${mediaType}/products/${filename}`;
+
+        const deleteResult = await deleteFileToVPS(filePath);
+        if (deleteResult.success) {
+          console.log(`Fichier supprimé avec succès: ${filePath}`);
+        } else {
+          console.error(
+            `Erreur lors de la suppression du fichier ${filePath}:`,
+            deleteResult.message
+          );
+        }
+      } catch (err) {
+        console.error(
+          `Erreur lors de la suppression du fichier ${mediaUrl}:`,
+          err
+        );
+      }
+    }
+
+    await Product.destroy({
+      where: { id: productId },
+    });
+
+    await disconnectSFTP();
+
+    return res.status(200).json({
+      message: "Produit et fichiers associés supprimés avec succès",
+      deletedFiles: mediaUrls,
+    });
   } catch (error) {
     console.error("Erreur lors de la suppression du produit:", error);
     return res.status(500).json({
       message: "Erreur serveur lors de la suppression du produit",
       error: error.message,
     });
+  } finally {
+    try {
+      await disconnectSFTP();
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion SFTP:", err);
+    }
   }
 };
 
@@ -513,7 +564,6 @@ export const getAllFavoritesByUserId = async (req, res) => {
   const userId = verified.userId;
 
   try {
-    // Récupérer tous les favoris de l'utilisateur
     const favorites = await Favorite.findAll({ where: { userId } });
 
     if (!favorites || favorites.length === 0) {
@@ -522,23 +572,21 @@ export const getAllFavoritesByUserId = async (req, res) => {
         .json({ message: "Aucun favori trouvé pour cet utilisateur." });
     }
 
-    // Récupérer les informations des produits associés aux favoris
     const products = await Promise.all(
       favorites.map(async (favorite) => {
         const product = await Product.findByPk(favorite.productId);
         if (!product) {
-          console.warn(`Produit non trouvé pour l'ID: ${favorite.productId}`); // Log pour le débogage
-          return null; // Retourner null si le produit n'est pas trouvé
+          console.warn(`Produit non trouvé pour l'ID: ${favorite.productId}`);
+          return null;
         }
-        return product.toJSON(); // Convertir le produit en JSON
+        return product.toJSON();
       })
     );
 
-    // Filtrer les produits non trouvés
     const filteredProducts = products.filter((product) => product !== null);
 
     return res.status(200).json({
-      favorites: filteredProducts, // Retourner les produits associés aux favoris
+      favorites: filteredProducts,
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

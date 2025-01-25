@@ -1,25 +1,26 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 
-const Discount = sequelize.define(
-  "discount",
+const DiscountShopping = sequelize.define(
+  "discountShopping",
   {
     id: {
       type: DataTypes.INTEGER,
-      autoIncrement: true,
       primaryKey: true,
+      autoIncrement: true,
     },
-    productId: {
-      type: DataTypes.INTEGER,
+    code: {
+      type: DataTypes.STRING,
       allowNull: false,
+      unique: true,
     },
     discount: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
-    },
-    newPrice: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
+      validate: {
+        min: 0,
+        max: 100,
+      },
     },
     startDate: {
       type: DataTypes.DATE,
@@ -35,14 +36,13 @@ const Discount = sequelize.define(
     },
     updatedAt: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-      onUpdate: DataTypes.NOW,
+      allowNull: true,
     },
   },
   {
-    tableName: "discount",
+    tableName: "discountShopping",
     timestamps: true,
   }
 );
 
-export default Discount;
+export default DiscountShopping;

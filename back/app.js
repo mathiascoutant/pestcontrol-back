@@ -5,10 +5,12 @@ import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import productsRoutes from "./src/routes/productsRoutes.js";
 import shoppingRoutes from "./src/routes/shoppingRoutes.js";
-import discountRoutes from "./src/routes/discountRoutes.js";
+import discountProductRoutes from "./src/routes/discountProductRoutes.js";
 import commentRoutes from "./src/routes/commentRoutes.js";
 import subCategoriesRoutes from "./src/routes/subCategoriesRoutes.js";
 import paymentRoutes from "./src/routes/paymentRoutes.js";
+import discountShoppingRoutes from "./src/routes/discountShoppingRoutes.js";
+import mail from "./src/routes/mailTestRoutes.js";
 
 const app = express();
 
@@ -35,10 +37,12 @@ app.use(`/${api}/auth`, authRoutes);
 app.use(`/${api}/users`, userRoutes);
 app.use(`/${api}/products`, productsRoutes);
 app.use(`/${api}/shopping`, shoppingRoutes);
-app.use(`/${api}/discount`, discountRoutes);
+app.use(`/${api}/discountProduct`, discountProductRoutes);
+app.use(`/${api}/discountShopping`, discountShoppingRoutes);
 app.use(`/${api}/comment`, commentRoutes);
 app.use(`/${api}/subCategories`, subCategoriesRoutes);
 app.use(`/${api}/payments`, paymentRoutes);
+app.use(`/${api}/mail`, mail);
 
 // Gestion des erreurs 404
 app.use((req, res) => {

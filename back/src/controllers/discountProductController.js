@@ -1,5 +1,5 @@
 import { verifyToken } from "../utils/jwtUtils.js";
-import * as discountService from "../services/discountService.js";
+import * as discountService from "../services/discountProductService.js";
 import Product from "../models/productModel.js";
 
 export const addDiscount = async (req, res) => {

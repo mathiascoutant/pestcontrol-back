@@ -31,6 +31,15 @@ export const uploadFileToVPS = async (file, Id, index, type, destination) => {
   }
 };
 
+export const deleteFileToVPS = async (filePath) => {
+  try {
+    await sftp.delete(filePath);
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+};
+
 export const disconnectSFTP = async () => {
   await sftp.end();
 };
