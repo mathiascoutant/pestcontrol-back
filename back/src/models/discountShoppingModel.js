@@ -6,21 +6,16 @@ const DiscountShopping = sequelize.define(
   {
     id: {
       type: DataTypes.INTEGER,
-      primaryKey: true,
       autoIncrement: true,
+      primaryKey: true,
     },
     code: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
     },
     discount: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
-      validate: {
-        min: 0,
-        max: 100,
-      },
     },
     startDate: {
       type: DataTypes.DATE,
@@ -30,13 +25,30 @@ const DiscountShopping = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
     },
+    multiUsage: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+    },
+    nbrAutorisationUsage: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    nbrUsed: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    fonction: {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
     },
     updatedAt: {
       type: DataTypes.DATE,
-      allowNull: true,
+      defaultValue: DataTypes.NOW,
+      onUpdate: DataTypes.NOW,
     },
   },
   {

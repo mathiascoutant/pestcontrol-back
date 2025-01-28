@@ -20,13 +20,29 @@ export const addDiscountCode = async (req, res) => {
     }
 
     // Récupération des données du body
-    const { code, discount, startDate, endDate } = req.body;
+    const {
+      code,
+      discount,
+      startDate,
+      endDate,
+      unique,
+      multiUsage,
+      nbrAutorisationUsage,
+      fonction,
+    } = req.body;
 
     // Vérification de la présence de tous les champs requis
-    if (!code || !discount || !startDate || !endDate) {
+    if (
+      !code ||
+      !discount ||
+      !startDate ||
+      !endDate ||
+      typeof multiUsage === "undefined" ||
+      !fonction
+    ) {
       return res.status(400).json({
         message:
-          "Tous les champs sont obligatoires (code, discount, startDate, endDate)",
+          "Tous les champs sont obligatoires (code, discount, startDate, endDate, unique, fonction)",
       });
     }
 
@@ -36,6 +52,22 @@ export const addDiscountCode = async (req, res) => {
       return res.status(400).json({
         message:
           "Le pourcentage de réduction doit être un nombre entre 0 et 100",
+      });
+    }
+
+    // Définir nbrAutorisationUsage en fonction de multiUsage
+    const usageCount = multiUsage ? nbrAutorisationUsage : 1;
+
+    // Validation de nbrAutorisationUsage si unique est false
+    if (
+      !unique &&
+      (nbrAutorisationUsage === undefined ||
+        !Number.isInteger(nbrAutorisationUsage) ||
+        nbrAutorisationUsage <= 0)
+    ) {
+      return res.status(400).json({
+        message:
+          "nbrAutorisationUsage doit être un entier supérieur à 0 si le code n'est pas unique",
       });
     }
 
@@ -79,6 +111,10 @@ export const addDiscountCode = async (req, res) => {
       discount: discountValue,
       startDate: start,
       endDate: end,
+      multiUsage,
+      nbrAutorisationUsage: usageCount,
+      nbrUsed: 0,
+      fonction,
     });
 
     return res.status(201).json({
@@ -87,6 +123,10 @@ export const addDiscountCode = async (req, res) => {
         id: newDiscountCode.id,
         code: newDiscountCode.code,
         discount: newDiscountCode.discount,
+        multiUsage: newDiscountCode.multiUsage,
+        nbrAutorisationUsage: newDiscountCode.nbrAutorisationUsage,
+        nbrUsed: newDiscountCode.nbrUsed,
+        fonction: newDiscountCode.fonction,
         startDate: newDiscountCode.startDate,
         endDate: newDiscountCode.endDate,
         createdAt: newDiscountCode.createdAt,
