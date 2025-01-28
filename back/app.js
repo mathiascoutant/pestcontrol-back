@@ -8,7 +8,7 @@ import shoppingRoutes from "./src/routes/shoppingRoutes.js";
 import discountProductRoutes from "./src/routes/discountProductRoutes.js";
 import commentRoutes from "./src/routes/commentRoutes.js";
 import subCategoriesRoutes from "./src/routes/subCategoriesRoutes.js";
-import paymentRoutes from "./src/routes/paymentRoutes.js";
+//import paymentRoutes from "./src/routes/paymentRoutes.js";
 import discountShoppingRoutes from "./src/routes/discountShoppingRoutes.js";
 import mail from "./src/routes/mailTestRoutes.js";
 
@@ -41,7 +41,7 @@ app.use(`/${api}/discountProduct`, discountProductRoutes);
 app.use(`/${api}/discountShopping`, discountShoppingRoutes);
 app.use(`/${api}/comment`, commentRoutes);
 app.use(`/${api}/subCategories`, subCategoriesRoutes);
-app.use(`/${api}/payments`, paymentRoutes);
+//app.use(`/${api}/payments`, paymentRoutes);
 app.use(`/${api}/mail`, mail);
 
 // Gestion des erreurs 404
