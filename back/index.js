@@ -1,7 +1,7 @@
 import { app } from "./app.js";
 import { connectDatabase } from "./src/config/database.js";
 
-const PORT = 3002;
+const PORT = 3003;
 
 const checkServerStatus = () => {
   const currentTime = new Date().toLocaleString(); // Récupérer l'heure actuelle
