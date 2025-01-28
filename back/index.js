@@ -1,7 +1,10 @@
-import { app } from "./app.js";
+import express from "express";
+import https from "https";
+import fs from "fs";
 import { connectDatabase } from "./src/config/database.js";
 
-const PORT = 3002;
+const app = express();
+const port = 3002;
 
 const checkServerStatus = () => {
   const currentTime = new Date().toLocaleString(); // Récupérer l'heure actuelle
@@ -9,18 +12,31 @@ const checkServerStatus = () => {
   // Vous pouvez ajouter d'autres vérifications ici, par exemple, vérifier la connexion à la base de données
 };
 
+// Middleware et routes ici
+app.get("/", (req, res) => {
+  res.send("Hello from Node.js backend!");
+});
+
+// Options SSL
+const options = {
+  key: fs.readFileSync("/etc/letsencrypt/live/pestcontrol33.com/privkey.pem"),
+  cert: fs.readFileSync(
+    "/etc/letsencrypt/live/pestcontrol33.com/fullchain.pem"
+  ),
+};
+
 async function startServer() {
   try {
     await connectDatabase();
 
-    app.listen(PORT, () => {
+    // Démarrer le serveur HTTPS
+    https.createServer(options, app).listen(port, () => {
       const currentTime = new Date().toLocaleString(); // Récupérer l'heure actuelle
       console.log(
-        `Serveur démarré sur http://https://pestcontrol33.vercel.app le ${currentTime}`
+        `Serveur démarré sur https://localhost:${port} le ${currentTime}`
       );
       // Vérifier l'état du serveur toutes les heures (3600000 ms)
       setInterval(checkServerStatus, 3600000);
-      //console.log(`Serveur démarré sur http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error("Erreur lors du démarrage du serveur:", error);
