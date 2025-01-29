@@ -121,7 +121,7 @@ export const addSubCategory = async (req, res) => {
     );
 
     if (mediaResult.success) {
-      const baseUrl = `http://37.187.225.41/medias/${mediaType}/subCategories`;
+      const baseUrl = `https://pestcontrol33.com/medias/${mediaType}/subCategories`;
       const pictureUrl = `${baseUrl}/${mediaResult.filename}`;
 
       // Mettre à jour la sous-catégorie avec le chemin de l'image
