@@ -150,7 +150,7 @@ export const addProduct = async (req, res) => {
       );
 
       if (mediaResult.success) {
-        const baseUrl = `http://37.187.225.41/medias/${mediaType}/products`;
+        const baseUrl = `https://37.187.225.41/medias/${mediaType}/products`;
         if (mediaType === "images") {
           mediaUrls.imageUrls.push(`${baseUrl}/${mediaResult.filename}`);
         } else if (mediaType === "videos") {
