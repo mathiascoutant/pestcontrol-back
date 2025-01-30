@@ -4,11 +4,30 @@ import { Op } from "sequelize";
 import mongoose from "mongoose";
 import { comparePassword, hashPassword } from "../utils/passwordUtils.js";
 import { JWT_SECRET, generateToken } from "../utils/jwtUtils.js";
-import { template } from "@babel/core";
+import axios from "axios";
 
 export const register = async (req, res) => {
   try {
-    const { nom, prenom, pseudo, email, password } = req.body;
+    const { nom, prenom, pseudo, email, password, captchaToken } = req.body;
+
+    // Vérification du CAPTCHA
+    const captchaResponse = await axios.post(
+      `https://www.google.com/recaptcha/api/siteverify`,
+      null,
+      {
+        params: {
+          secret: "6LdLC8gqAAAAACsAj4AJq9kSgny3tz1Nv4uoMN-R",
+          response: captchaToken,
+        },
+      }
+    );
+
+    const { success } = captchaResponse.data;
+    if (!success) {
+      return res
+        .status(400)
+        .json({ message: "Échec de la vérification du CAPTCHA." });
+    }
 
     if (!nom || !prenom || !pseudo || !email || !password) {
       return res
