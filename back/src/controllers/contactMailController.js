@@ -11,23 +11,23 @@ export const sendContactEmail = async (req, res) => {
     }
 
     const transporter = nodemailer.createTransport({
-      host: "vps-f81ba1bf.vps.ovh.net", 
-      port: 587, 
+      host: "vps-f81ba1bf.vps.ovh.net",
+      port: 587,
       secure: false,
       auth: {
-        user: "admin@pestcontrol33.com", 
+        user: "noreply@pestcontrol33.com",
         pass: "Lacoste33710?",
       },
       debug: true,
       tls: {
-        rejectUnauthorized: false, 
+        rejectUnauthorized: false,
       },
     });
 
     const mailOptions = {
       from: '"PestControl33" <technique@pestcontrol33.com>',
-      to: to, 
-      subject: `[Contact] ${subject}`, 
+      to: to,
+      subject: `[Contact] ${subject}`,
       html: `
           <div style="font-family: Arial, sans-serif; color: #333;">
               <h2 style="color: #4CAF50;">Nouveau message de contact</h2>
@@ -38,7 +38,7 @@ export const sendContactEmail = async (req, res) => {
               <p><strong>Message :</strong></p>
               <p style="background-color: #f9f9f9; padding: 10px; border-left: 4px solid #4CAF50;">${text}</p>
           </div>
-      `, 
+      `,
     };
 
     const info = await transporter.sendMail(mailOptions);
