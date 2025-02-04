@@ -54,7 +54,7 @@ export const forgetPassword = async (req, res) => {
       port: 587,
       secure: false,
       auth: {
-        user: "admin@pestcontrol33.com",
+        user: "noreply@pestcontrol33.com",
         pass: "Lacoste33710?",
       },
       tls: {
