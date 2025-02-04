@@ -5,6 +5,10 @@ import Paiements from "../models/paiementModel.js"; // Assurez-vous d'importer l
 // Charger les variables d'environnement à partir du fichier .env
 dotenv.config();
 
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("La clé secrète Stripe n'est pas définie dans le fichier .env");
+}
+
 // Utiliser la clé secrète Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -37,12 +41,10 @@ export const simulatePurchase = async (req, res) => {
       typeof product.quantity !== "number" ||
       product.quantity <= 0
     ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Chaque produit doit avoir un productId valide et une quantité positive.",
-        });
+      return res.status(400).json({
+        error:
+          "Chaque produit doit avoir un productId valide et une quantité positive.",
+      });
     }
   }
 
