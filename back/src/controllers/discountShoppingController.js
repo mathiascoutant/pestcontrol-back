@@ -105,6 +105,12 @@ export const addDiscountCode = async (req, res) => {
       });
     }
 
+    if (fonction !== "%" && fonction !== "€") {
+      return res.status(400).json({
+        message: "La fonction doit être soit '%' soit '€'",
+      });
+    }
+
     // Création du code promo
     const newDiscountCode = await DiscountShopping.create({
       code,
