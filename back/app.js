@@ -8,7 +8,7 @@ import shoppingRoutes from "./src/routes/shoppingRoutes.js";
 import discountProductRoutes from "./src/routes/discountProductRoutes.js";
 import commentRoutes from "./src/routes/commentRoutes.js";
 import subCategoriesRoutes from "./src/routes/subCategoriesRoutes.js";
-import paymentRoutes from "./src/routes/paymentRoutes.js";
+//import paymentRoutes from "./src/routes/paymentRoutes.js";
 import discountShoppingRoutes from "./src/routes/discountShoppingRoutes.js";
 import contactMailRoutes from "./src/routes/contactMailRoutes.js";
 import forgetPasswordRoutes from "./src/routes/forgetPasswordRoutes.js";
@@ -42,7 +42,7 @@ app.use(`/${api}/discountProduct`, discountProductRoutes);
 app.use(`/${api}/discountShopping`, discountShoppingRoutes);
 app.use(`/${api}/comment`, commentRoutes);
 app.use(`/${api}/subCategories`, subCategoriesRoutes);
-app.use(`/${api}/payments`, paymentRoutes);
+//app.use(`/${api}/payments`, paymentRoutes);
 app.use(`/${api}/contact`, contactMailRoutes);
 app.use(`/${api}/forgetpassword`, forgetPasswordRoutes);
 
