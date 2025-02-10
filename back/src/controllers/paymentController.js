@@ -1,9 +1,15 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import Paiements from "../models/paiementModel.js"; // Assurez-vous d'importer le modèle Paiement
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Obtenir le chemin du répertoire actuel
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Charger les variables d'environnement à partir du fichier .env
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error(
