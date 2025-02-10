@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import Paiements from "../models/paiementModel.js"; // Assurez-vous d'importer le modèle Paiement
 import path from "path";
 import { fileURLToPath } from "url";
+import { verifyToken } from "../utils/jwtUtils.js"; // Assurez-vous d'importer votre fonction de vérification du token
 
 // Obtenir le chemin du répertoire actuel
 const __filename = fileURLToPath(import.meta.url);
@@ -128,5 +129,81 @@ export const createPaymentIntent = async (req, res) => {
   } catch (error) {
     console.error("Erreur lors de la création du PaymentIntent :", error);
     return res.status(500).json({ error: error.message });
+  }
+};
+
+export const getPaymentsByUserId = async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  const verified = verifyToken(token);
+  if (!verified) {
+    return res.status(401).json({ message: "Token invalide ou manquant" });
+  }
+
+  const userId = verified.userId; // Supposons que l'ID utilisateur est stocké dans le token
+
+  try {
+    // Récupérer les paiements associés à l'ID utilisateur
+    const paiements = await Paiements.findAll({
+      where: {
+        userId: userId, // Filtrer par userId
+      },
+    });
+
+    // Si aucun paiement n'est trouvé
+    if (!paiements || paiements.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Aucun paiement trouvé pour cet utilisateur." });
+    }
+
+    // Répondre avec les paiements trouvés
+    return res.status(200).json({
+      message: "Paiements récupérés avec succès",
+      paiements,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des paiements :", error);
+    return res.status(500).json({
+      message: "Erreur lors de la récupération des paiements",
+      error: error.message,
+    });
+  }
+};
+
+export const getAllPayments = async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  const verified = verifyToken(token);
+  if (!verified) {
+    return res.status(401).json({ message: "Token invalide ou manquant" });
+  }
+
+  if (verified.admin != 1) {
+    return res.status(403).json({
+      message: "Vous n'avez pas l'autorisation pour lister les paiements",
+    });
+  }
+
+  try {
+    // Récupérer les paiements associés à l'ID utilisateur
+    const paiements = await Paiements.findAll({});
+
+    // Si aucun paiement n'est trouvé
+    if (!paiements || paiements.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Aucun paiement trouvé pour cet utilisateur." });
+    }
+
+    // Répondre avec les paiements trouvés
+    return res.status(200).json({
+      message: "Paiements récupérés avec succès",
+      paiements,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des paiements :", error);
+    return res.status(500).json({
+      message: "Erreur lors de la récupération des paiements",
+      error: error.message,
+    });
   }
 };
