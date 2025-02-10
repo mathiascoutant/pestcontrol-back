@@ -6,7 +6,9 @@ import Paiements from "../models/paiementModel.js"; // Assurez-vous d'importer l
 dotenv.config();
 
 if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("La clé secrète Stripe n'est pas définie dans le fichier .env");
+  throw new Error(
+    "La clé secrète Stripe n'est pas définie dans le fichier .env"
+  );
 }
 
 // Utiliser la clé secrète Stripe
