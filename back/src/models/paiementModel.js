@@ -26,12 +26,10 @@ const Paiements = sequelize.define(
       allowNull: false,
     },
     currency: {
-      // Nouvelle colonne pour la devise
       type: DataTypes.STRING(10),
       allowNull: false,
     },
-    payment_type: {
-      // Nouvelle colonne pour le type de paiement
+    source: {
       type: DataTypes.STRING(10),
       allowNull: false,
     },
