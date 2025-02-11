@@ -37,6 +37,10 @@ const Product = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    subCategoryId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     medias: {
       type: DataTypes.TEXT,
       allowNull: true,

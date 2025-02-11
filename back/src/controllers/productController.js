@@ -22,6 +22,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { promisify } from "util";
+import { getSubCategoryById } from "../services/subCategoryService.js";
 
 const storage = multer.memoryStorage();
 const uploadMiddleware = multer({
@@ -74,7 +75,14 @@ export const addProduct = async (req, res) => {
   }
 
   try {
-    const { nom, description, stock, prix, conseilsUtilisation } = req.body;
+    const {
+      nom,
+      description,
+      stock,
+      prix,
+      conseilsUtilisation,
+      subCategoryId,
+    } = req.body;
 
     const formattedPrix = parseFloat(prix.replace(",", "."));
 
@@ -83,12 +91,18 @@ export const addProduct = async (req, res) => {
       !description ||
       !stock ||
       !conseilsUtilisation ||
-      isNaN(formattedPrix)
+      isNaN(formattedPrix) ||
+      !subCategoryId
     ) {
       return res.status(400).json({
         message:
           "Tous les champs sont obligatoires et le prix doit être un nombre valide.",
       });
+    }
+
+    const subCategory = await getSubCategoryById(subCategoryId);
+    if (!subCategory) {
+      return res.status(404).json({ message: "Sous-catégorie non trouvée." });
     }
 
     if (!req.files || req.files.length === 0) {
@@ -122,6 +136,7 @@ export const addProduct = async (req, res) => {
       prix: formattedPrix,
       favorites: 0,
       conseilsUtilisation,
+      subCategoryId,
       medias: {
         imageUrls: [],
         videoUrls: [],
@@ -217,7 +232,6 @@ export const fetchAllProducts = async (req, res) => {
 
     let likedProductIds = new Set();
     if (userId) {
-      // Récupérer les favoris de l'utilisateur
       const userFavorites = await Favorite.findAll({
         where: { userId: userId },
       });
@@ -307,6 +321,7 @@ export const fetchProduct = async (req, res) => {
       conseilsUtilisation: product.conseilsUtilisation,
       newPrice: discountInfo.newPrice || null,
       discount: discountInfo.discount || null,
+      subCategoryId: product.subCategoryId,
       like: like,
     };
 

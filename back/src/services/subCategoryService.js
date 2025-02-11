@@ -8,3 +8,7 @@ export const createSubCategory = async (Data) => {
     throw new Error("Erreur lors de la création du produit: " + error.message);
   }
 };
+
+export const getSubCategoryById = async (id) => {
+  return await SubCategory.findByPk(id);
+};
