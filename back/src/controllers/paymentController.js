@@ -25,9 +25,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Contrôleur pour simuler un achat
 export const simulatePurchase = async (req, res) => {
-  const { amount, currency, userId, products, source } = req.body; // Récupérer les données de la requête
+  const { amount, currency, userId, products, paymentMethodId } = req.body;
 
-  // Validation des données d'entrée
   if (!amount || typeof amount !== "number" || amount <= 0) {
     return res
       .status(400)
@@ -36,8 +35,8 @@ export const simulatePurchase = async (req, res) => {
   if (!currency || typeof currency !== "string") {
     return res.status(400).json({ error: "La devise est requise." });
   }
-  if (!source || typeof source !== "string") {
-    return res.status(400).json({ error: "Le token de carte est requis." });
+  if (!paymentMethodId || typeof paymentMethodId !== "string") {
+    return res.status(400).json({ error: "Le paymentMethodId est requis." });
   }
   if (!userId || !Array.isArray(products) || products.length === 0) {
     return res
@@ -46,70 +45,57 @@ export const simulatePurchase = async (req, res) => {
   }
 
   try {
-    // Vérifier si l'utilisateur existe dans la base de données
-    const existingUser = await User.findOne({
-      where: { id: userId }, // Vérifiez si l'ID utilisateur existe
-    });
-
+    const existingUser = await User.findOne({ where: { id: userId } });
     if (!existingUser) {
-      return res.status(404).json({
-        message: "Cet utilisateur n'existe pas.",
-      });
+      return res.status(404).json({ message: "Cet utilisateur n'existe pas." });
     }
 
-    // Vérifier si chaque productId existe
     for (const product of products) {
-      const { productId, quantity } = product;
-
-      // Vérifiez que le productId est valide
-      if (!productId || typeof productId !== "number") {
-        return res
-          .status(400)
-          .json({ error: "productId doit être un nombre valide." });
-      }
-
       const existingProduct = await Product.findOne({
-        where: { id: productId }, // Vérifiez si le productId existe
+        where: { id: product.productId },
       });
-
       if (!existingProduct) {
-        return res.status(404).json({
-          message: `Le produit avec l'ID ${productId} n'existe pas.`,
-        });
-      }
-
-      // Vérifiez que la quantité est valide
-      if (!quantity || typeof quantity !== "number" || quantity <= 0) {
         return res
-          .status(400)
-          .json({
-            error: `La quantité pour le produit ${productId} doit être un nombre positif.`,
-          });
+          .status(404)
+          .json({ message: `Le produit ${product.productId} n'existe pas.` });
       }
     }
 
-    // Créer une charge
-    const charge = await stripe.charges.create({
-      amount, // Montant en cents
+    // Créer un PaymentIntent pour supporter 3D Secure
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
       currency,
-      source, // Token de la carte ou ID de source
-      description: "Achat simulé",
+      payment_method: paymentMethodId,
+      confirmation_method: "manual", // Nécessite une confirmation manuelle
+      confirm: true, // Tente de confirmer immédiatement
     });
 
-    // Insérer les informations de paiement dans la base de données
-    const paiement = await Paiements.create({
-      userId,
-      products: JSON.stringify(products), // Convertir les produits en chaîne JSON
-      totalPrice: amount / 100, // Convertir le montant en euros
-      invoice: charge.id, // Utiliser l'ID de la charge comme numéro de facture
-      currency, // Nouvelle colonne pour la devise
-      source, // Nouvelle colonne pour le type de paiement
-    });
+    // Vérifier si une authentification 3D Secure est nécessaire
+    if (
+      paymentIntent.status === "requires_action" ||
+      paymentIntent.status === "requires_source_action"
+    ) {
+      return res.status(200).json({
+        requiresAction: true,
+        clientSecret: paymentIntent.client_secret,
+      });
+    } else if (paymentIntent.status === "succeeded") {
+      // Paiement réussi, enregistrer en base de données
+      const paiement = await Paiements.create({
+        userId,
+        products: JSON.stringify(products),
+        totalPrice: amount / 100,
+        invoice: paymentIntent.id,
+        currency,
+        source: "card",
+      });
 
-    // Répondre avec les détails de la charge et l'ID du paiement
-    return res.status(200).json({ charge, paymentId: paiement.id });
+      return res.status(200).json({ success: true, paymentId: paiement.id });
+    } else {
+      return res.status(400).json({ error: "Échec du paiement." });
+    }
   } catch (error) {
-    console.error("Erreur lors de la simulation d'achat :", error);
+    console.error("Erreur lors du paiement :", error);
     return res.status(500).json({ error: error.message });
   }
 };
