@@ -30,7 +30,7 @@ const Paiements = sequelize.define(
       allowNull: false,
     },
     source: {
-      type: DataTypes.STRING(10),
+      type: DataTypes.STRING(255),
       allowNull: false,
     },
   },
