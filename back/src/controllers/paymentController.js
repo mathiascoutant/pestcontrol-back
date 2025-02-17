@@ -1,9 +1,11 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
-import Paiements from "../models/paiementModel.js"; // Assurez-vous d'importer le modèle Paiement
+import Paiements from "../models/paiementModel.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { verifyToken } from "../utils/jwtUtils.js"; // Assurez-vous d'importer votre fonction de vérification du token
+import { verifyToken } from "../utils/jwtUtils.js";
+import User from "../models/userModel.js";
+import Product from "../models/productModel.js";
 
 // Obtenir le chemin du répertoire actuel
 const __filename = fileURLToPath(import.meta.url);
@@ -43,21 +45,49 @@ export const simulatePurchase = async (req, res) => {
       .json({ error: "L'ID utilisateur et les produits sont requis." });
   }
 
-  // Validation des produits
-  for (const product of products) {
-    if (
-      !product.productId ||
-      typeof product.quantity !== "number" ||
-      product.quantity <= 0
-    ) {
-      return res.status(400).json({
-        error:
-          "Chaque produit doit avoir un productId valide et une quantité positive.",
+  try {
+    // Vérifier si l'utilisateur existe dans la base de données
+    const existingUser = await User.findOne({
+      where: { id: userId }, // Vérifiez si l'ID utilisateur existe
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        message: "Cet utilisateur n'existe pas.",
       });
     }
-  }
 
-  try {
+    // Vérifier si chaque productId existe
+    for (const product of products) {
+      const { productId, quantity } = product;
+
+      // Vérifiez que le productId est valide
+      if (!productId || typeof productId !== "number") {
+        return res
+          .status(400)
+          .json({ error: "productId doit être un nombre valide." });
+      }
+
+      const existingProduct = await Product.findOne({
+        where: { id: productId }, // Vérifiez si le productId existe
+      });
+
+      if (!existingProduct) {
+        return res.status(404).json({
+          message: `Le produit avec l'ID ${productId} n'existe pas.`,
+        });
+      }
+
+      // Vérifiez que la quantité est valide
+      if (!quantity || typeof quantity !== "number" || quantity <= 0) {
+        return res
+          .status(400)
+          .json({
+            error: `La quantité pour le produit ${productId} doit être un nombre positif.`,
+          });
+      }
+    }
+
     // Créer une charge
     const charge = await stripe.charges.create({
       amount, // Montant en cents
@@ -79,10 +109,7 @@ export const simulatePurchase = async (req, res) => {
     // Répondre avec les détails de la charge et l'ID du paiement
     return res.status(200).json({ charge, paymentId: paiement.id });
   } catch (error) {
-    console.error(
-      "Erreur lors de la création de la charge ou de l'enregistrement du paiement :",
-      error
-    );
+    console.error("Erreur lors de la simulation d'achat :", error);
     return res.status(500).json({ error: error.message });
   }
 };
