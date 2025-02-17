@@ -607,3 +607,35 @@ export const getAllFavoritesByUserId = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
+
+export const getProductsBySubCategoryId = async (req, res) => {
+  const subCategoryId = req.params.id;
+
+  try {
+    const subCategory = await getSubCategoryById(subCategoryId);
+    if (!subCategory) {
+      return res.status(404).json({ message: "Sous-catégorie non trouvée." });
+    }
+
+    const products = await Product.findAll({
+      where: { subCategoryId: subCategoryId },
+    });
+
+    if (!products || products.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Aucun produit trouvé pour cette sous-catégorie." });
+    }
+
+    return res.status(200).json({
+      message: "Produits récupérés avec succès",
+      products,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des produits :", error);
+    return res.status(500).json({
+      message: "Erreur lors de la récupération des produits",
+      error: error.message,
+    });
+  }
+};
