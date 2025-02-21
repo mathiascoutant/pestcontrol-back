@@ -33,6 +33,22 @@ const Paiements = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
+    urlInvoice: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    isReduction: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+    },
+    reductionFunction: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    reductionAmount: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
   },
   {
     tableName: "paiements",

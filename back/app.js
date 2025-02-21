@@ -33,6 +33,7 @@ const api = "api/v1";
 // Middleware pour parser le JSON
 app.use(express.json());
 
+
 // Utilisation des routes
 app.use(`/${api}/auth`, authRoutes);
 app.use(`/${api}/users`, userRoutes);
