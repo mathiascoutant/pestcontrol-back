@@ -75,8 +75,7 @@ export const sendInvoiceEmail = async (
 };
 
 export const simulatePurchase = async (req, res) => {
-  const { currency, userId, products, paymentMethodId, email, isReduction } =
-    req.body;
+  const { currency, products, paymentMethodId, email, isReduction } = req.body;
 
   let { reductionFunction, reductionAmount } = req.body; // Déclaration avec let
 
@@ -85,6 +84,14 @@ export const simulatePurchase = async (req, res) => {
     reductionFunction = ""; // Valeur vide au lieu de null
     reductionAmount = 0; // 0 au lieu de null
   }
+
+  const token = req.headers.authorization?.split(" ")[1];
+  const verified = verifyToken(token);
+  if (!verified) {
+    return res.status(401).json({ message: "Token invalide ou manquant" });
+  }
+
+  const userId = verified.userId;
 
   // Vérifications de base des entrées
   if (!currency || typeof currency !== "string") {
