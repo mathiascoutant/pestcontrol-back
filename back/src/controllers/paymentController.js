@@ -345,7 +345,7 @@ export const createPaymentIntent = async (req, res) => {
       confirm: true,
       payment_method_options: {
         card: {
-          request_three_d_secure: "required", // Demande 3D Secure si nécessaire
+          request_three_d_secure: "any", // Demande 3D Secure si nécessaire
         },
       },
     });
