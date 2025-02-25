@@ -286,7 +286,15 @@ export const retrieveCharge = async (req, res) => {
 };
 
 export const createPaymentIntent = async (req, res) => {
-  const { currency, paymentMethodId, userId, products } = req.body;
+  const { currency, paymentMethodId, products } = req.body;
+
+  const token = req.headers.authorization?.split(" ")[1];
+  const verified = verifyToken(token);
+  if (!verified) {
+    return res.status(401).json({ message: "Token invalide ou manquant" });
+  }
+
+  const userId = verified.userId;
 
   // Vérification des paramètres d'entrée
   if (!currency || typeof currency !== "string") {
