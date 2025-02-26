@@ -230,6 +230,7 @@ export const simulatePurchase = async (req, res) => {
       currency,
       payment_method: paymentMethodId,
       confirm: true,
+      return_url: "https://pestcontrol33.com/payment-success",
       payment_method_options: {
         card: {
           request_three_d_secure: "any",
