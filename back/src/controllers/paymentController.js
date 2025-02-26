@@ -79,9 +79,10 @@ export const simulatePurchase = async (req, res) => {
 
   let { reductionFunction, reductionAmount } = req.body; // Déclaration avec let
 
+  // Assurer une valeur par défaut pour éviter NULL
   if (!isReduction) {
-    reductionFunction = "";
-    reductionAmount = 0;
+    reductionFunction = ""; // Valeur vide au lieu de null
+    reductionAmount = 0; // 0 au lieu de null
   }
 
   const token = req.headers.authorization?.split(" ")[1];
@@ -92,6 +93,7 @@ export const simulatePurchase = async (req, res) => {
 
   const userId = verified.userId;
 
+  // Vérifications de base des entrées
   if (!currency || typeof currency !== "string") {
     return res.status(400).json({ error: "La devise est requise." });
   }
@@ -113,6 +115,7 @@ export const simulatePurchase = async (req, res) => {
     let productDetails = [];
     let totalAmount = 0;
 
+    // Calcul du montant total des produits sans réduction
     for (const product of products) {
       const existingProduct = await Product.findOne({
         where: { id: product.productId },
@@ -124,7 +127,7 @@ export const simulatePurchase = async (req, res) => {
           .json({ message: `Le produit ${product.productId} n'existe pas.` });
       }
 
-      const priceInCents = Math.round(existingProduct.prix * 100);
+      const priceInCents = Math.round(existingProduct.prix * 100); // Conversion en centimes
 
       productDetails.push({
         id: product.productId,
@@ -133,11 +136,12 @@ export const simulatePurchase = async (req, res) => {
         price: priceInCents,
       });
 
-      totalAmount += priceInCents * product.quantity;
+      totalAmount += priceInCents * product.quantity; // Calcul du montant total sans réduction
     }
 
-    let reductionInCents = 0;
+    let reductionInCents = 0; // Initialisation
 
+    // Appliquer la réduction si elle est activée
     if (isReduction && reductionAmount > 0) {
       if (reductionFunction === "%") {
         if (reductionAmount > 100 || reductionAmount < 0) {
@@ -157,12 +161,14 @@ export const simulatePurchase = async (req, res) => {
 
       totalAmount -= reductionInCents;
     } else {
-      reductionFunction = "";
-      reductionAmount = 0;
+      reductionFunction = ""; // Valeur vide pour éviter NULL
+      reductionAmount = 0; // 0 au lieu de null
     }
 
+    // Si la réduction couvre entièrement la facture, ne pas payer
     const shouldSkipPayment = totalAmount <= 0;
 
+    // Recherche de l'utilisateur dans Stripe
     const customers = await stripe.customers.search({
       query: `email:'${email}'`,
     });
@@ -185,6 +191,7 @@ export const simulatePurchase = async (req, res) => {
       },
     });
 
+    // Créer la facture
     const invoice = await stripe.invoices.create({
       customer: customer.id,
       collection_method: "send_invoice",
@@ -192,6 +199,7 @@ export const simulatePurchase = async (req, res) => {
       auto_advance: !shouldSkipPayment,
     });
 
+    // Ajouter les produits à la facture
     for (const product of productDetails) {
       await stripe.invoiceItems.create({
         customer: customer.id,
@@ -203,10 +211,11 @@ export const simulatePurchase = async (req, res) => {
       });
     }
 
+    // Ajouter la réduction si applicable
     if (isReduction && reductionInCents > 0) {
       await stripe.invoiceItems.create({
         customer: customer.id,
-        unit_amount: -reductionInCents,
+        unit_amount: -reductionInCents, // Réduction en centimes, valeur négative
         quantity: 1,
         currency: "eur",
         description: `Réduction (${reductionFunction} ${reductionAmount})`,
@@ -214,8 +223,10 @@ export const simulatePurchase = async (req, res) => {
       });
     }
 
+    // Finaliser la facture
     const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
 
+    // Si la facture est de 0€, ne pas payer
     if (shouldSkipPayment) {
       return res.status(200).json({
         message: "La facture a été générée avec une réduction complète.",
@@ -224,31 +235,7 @@ export const simulatePurchase = async (req, res) => {
       });
     }
 
-    // **Modification : Autorisation des redirections uniquement ici**
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalAmount,
-      currency,
-      payment_method: paymentMethodId,
-      confirm: true,
-      return_url: "https://pestcontrol33.com/payment-success",
-      payment_method_options: {
-        card: {
-          request_three_d_secure: "any",
-        },
-      },
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: "always", // **Autorise les redirections ici**
-      },
-    });
-
-    if (paymentIntent.status === "requires_action") {
-      return res.status(200).json({
-        requires_action: true,
-        client_secret: paymentIntent.client_secret,
-      });
-    }
-
+    // Payer la facture
     const paidInvoice = await stripe.invoices.pay(finalizedInvoice.id);
 
     if (!paidInvoice.hosted_invoice_url) {
@@ -258,6 +245,7 @@ export const simulatePurchase = async (req, res) => {
     }
 
     if (paidInvoice.status === "paid") {
+      // Sauvegarder le paiement en base de données
       await Paiements.create({
         userId,
         products: JSON.stringify(productDetails),
@@ -267,10 +255,11 @@ export const simulatePurchase = async (req, res) => {
         source: "card",
         urlInvoice: paidInvoice.hosted_invoice_url,
         isReduction: isReduction || false,
-        reductionFunction,
-        reductionAmount,
+        reductionFunction, // Garder "" au lieu de null
+        reductionAmount, // Garder 0 au lieu de null
       });
 
+      // Envoi de l'email
       await sendInvoiceEmail(
         totalAmount,
         email,
@@ -369,6 +358,7 @@ export const createPaymentIntent = async (req, res) => {
       currency,
       payment_method: paymentMethodId,
       confirm: true,
+      return_url: "https://pestcontrol33.com/payment-success",
       payment_method_options: {
         card: {
           request_three_d_secure: "any", // Demande 3D Secure si nécessaire
