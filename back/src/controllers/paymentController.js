@@ -365,7 +365,7 @@ export const createPaymentIntent = async (req, res) => {
       },
       automatic_payment_methods: {
         enabled: true,
-        allow_redirects: "always", // Désactive les redirections
+        allow_redirects: "never", // Désactive les redirections
       },
     });
 
