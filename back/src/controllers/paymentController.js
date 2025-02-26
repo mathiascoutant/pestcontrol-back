@@ -357,6 +357,7 @@ export const createPaymentIntent = async (req, res) => {
       amount: totalAmount, // Le montant total calculé
       currency,
       payment_method: paymentMethodId,
+      setup_future_usage: "off_session",
       confirm: true,
       return_url: "https://pestcontrol33.com/payment-success",
       payment_method_options: {
