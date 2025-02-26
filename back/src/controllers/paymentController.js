@@ -363,10 +363,6 @@ export const createPaymentIntent = async (req, res) => {
           request_three_d_secure: "any", // Demande 3D Secure si nécessaire
         },
       },
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: "never", // Désactive les redirections
-      },
     });
 
     // Vérification du statut du PaymentIntent
