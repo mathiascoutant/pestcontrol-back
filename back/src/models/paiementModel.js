@@ -49,6 +49,10 @@ const Paiements = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
+    fraisTransport: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
   },
   {
     tableName: "paiements",

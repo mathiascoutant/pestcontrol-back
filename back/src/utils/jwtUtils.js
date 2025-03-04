@@ -13,6 +13,13 @@ const generateToken = (payload) => {
   });
 };
 
+const generateTokenNotConnect = (payload) => {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: "1Y", // Le token expire après 1 an
+    algorithm: "HS256",
+  });
+};
+
 const verifyToken = (token) => {
   try {
     return jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
@@ -22,4 +29,4 @@ const verifyToken = (token) => {
   }
 };
 
-export { JWT_SECRET, generateToken, verifyToken };
+export { JWT_SECRET, generateToken, generateTokenNotConnect, verifyToken };

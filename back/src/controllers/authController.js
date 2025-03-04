@@ -36,7 +36,10 @@ export const register = async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      where: { [Op.or]: [{ pseudo }, { email }] },
+      where: {
+        [Op.or]: [{ pseudo }, { email }],
+        temp: 0, // Vérifier que temp est à 0
+      },
     });
     if (existingUser) {
       return res.status(400).json({
@@ -64,6 +67,7 @@ export const register = async (req, res) => {
       codePostale: null,
       pays: null,
       admin: 0,
+      temp: 0,
     });
 
     const token = generateToken({ userId: newUser.id, admin: newUser.admin });

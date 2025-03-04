@@ -3,10 +3,11 @@ import dotenv from "dotenv";
 import Paiements from "../models/paiementModel.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { verifyToken } from "../utils/jwtUtils.js";
+import { verifyToken, generateTokenNotConnect } from "../utils/jwtUtils.js";
 import User from "../models/userModel.js";
 import Product from "../models/productModel.js";
 import nodemailer from "nodemailer";
+import validator from "validator";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,7 +76,8 @@ export const sendInvoiceEmail = async (
 };
 
 export const simulatePurchase = async (req, res) => {
-  const { currency, products, paymentMethodId, email, isReduction } = req.body;
+  const { currency, products, paymentMethodId, isReduction, fraisTransport } =
+    req.body;
 
   let { reductionFunction, reductionAmount } = req.body; // Déclaration avec let
 
@@ -105,12 +107,19 @@ export const simulatePurchase = async (req, res) => {
       .status(400)
       .json({ error: "L'ID utilisateur et les produits sont requis." });
   }
+  if (!fraisTransport || fraisTransport < 0) {
+    return res
+      .status(400)
+      .json({ error: "Les frais de transports sont requis." });
+  }
 
   try {
     const existingUser = await User.findOne({ where: { id: userId } });
     if (!existingUser) {
       return res.status(404).json({ message: "Cet utilisateur n'existe pas." });
     }
+
+    const email = existingUser.email;
 
     let productDetails = [];
     let totalAmount = 0;
@@ -126,6 +135,12 @@ export const simulatePurchase = async (req, res) => {
           .status(404)
           .json({ message: `Le produit ${product.productId} n'existe pas.` });
       }
+      // Vérifier que le stock est suffisant
+      if (existingProduct.stock < product.quantity) {
+        return res.status(400).json({
+          error: `Stock insuffisant`,
+        });
+      }
 
       const priceInCents = Math.round(existingProduct.prix * 100); // Conversion en centimes
 
@@ -139,30 +154,50 @@ export const simulatePurchase = async (req, res) => {
       totalAmount += priceInCents * product.quantity; // Calcul du montant total sans réduction
     }
 
+    // Ajouter les frais de transport au montant total (conversion en centimes)
+    totalAmount += Math.round(fraisTransport * 100); // Convertir les frais de transport en centimes
+
     let reductionInCents = 0; // Initialisation
 
     // Appliquer la réduction si elle est activée
-    if (isReduction && reductionAmount > 0) {
-      if (reductionFunction === "%") {
-        if (reductionAmount > 100 || reductionAmount < 0) {
-          return res
-            .status(400)
-            .json({ error: "Réduction en % invalide (0-100%)." });
-        }
-        reductionInCents = Math.round(totalAmount * (reductionAmount / 100));
-      } else if (reductionFunction === "€") {
-        if (reductionAmount * 100 > totalAmount || reductionAmount < 0) {
-          return res
-            .status(400)
-            .json({ error: "Réduction en euros invalide." });
-        }
-        reductionInCents = Math.round(reductionAmount * 100);
+    if (isReduction) {
+      // Vérifier que reductionAmount et reductionFunction ne sont pas vides
+      if (
+        reductionAmount == null ||
+        reductionFunction == null ||
+        reductionAmount === "" ||
+        reductionFunction === ""
+      ) {
+        return res.status(400).json({
+          error:
+            "La réduction nécessite un montant et une fonction de réduction.",
+        });
       }
 
-      totalAmount -= reductionInCents;
-    } else {
-      reductionFunction = ""; // Valeur vide pour éviter NULL
-      reductionAmount = 0; // 0 au lieu de null
+      if (reductionAmount > 0) {
+        if (reductionFunction === "%") {
+          if (reductionAmount > 100 || reductionAmount < 0) {
+            return res
+              .status(400)
+              .json({ error: "Réduction en % invalide (0-100%)." });
+          }
+          reductionInCents = Math.round(totalAmount * (reductionAmount / 100));
+        } else if (reductionFunction === "€") {
+          if (reductionAmount * 100 > totalAmount || reductionAmount < 0) {
+            return res
+              .status(400)
+              .json({ error: "Réduction en euros invalide." });
+          }
+          reductionInCents = Math.round(reductionAmount * 100);
+        } else {
+          return res.status(400).json({ error: "Réduction invalide." });
+        }
+
+        totalAmount -= reductionInCents;
+      } else {
+        reductionFunction = ""; // Valeur vide pour éviter NULL
+        reductionAmount = 0; // 0 au lieu de null
+      }
     }
 
     // Si la réduction couvre entièrement la facture, ne pas payer
@@ -211,6 +246,18 @@ export const simulatePurchase = async (req, res) => {
       });
     }
 
+    // Ajouter les frais de transport à la facture
+    if (fraisTransport > 0) {
+      await stripe.invoiceItems.create({
+        customer: customer.id,
+        unit_amount: Math.round(fraisTransport * 100), // Convertir en centimes
+        quantity: 1,
+        currency: "eur",
+        description: `Frais de transport`,
+        invoice: invoice.id,
+      });
+    }
+
     // Ajouter la réduction si applicable
     if (isReduction && reductionInCents > 0) {
       await stripe.invoiceItems.create({
@@ -255,8 +302,9 @@ export const simulatePurchase = async (req, res) => {
         source: "card",
         urlInvoice: paidInvoice.hosted_invoice_url,
         isReduction: isReduction || false,
-        reductionFunction, // Garder "" au lieu de null
-        reductionAmount, // Garder 0 au lieu de null
+        reductionFunction,
+        reductionAmount,
+        fraisTransport: fraisTransport,
       });
 
       // Envoi de l'email
@@ -267,6 +315,24 @@ export const simulatePurchase = async (req, res) => {
         finalizedInvoice.number,
         res
       );
+
+      // Mettre à jour le stock des produits
+      for (const product of products) {
+        const existingProduct = await Product.findOne({
+          where: { id: product.productId },
+        });
+
+        if (existingProduct) {
+          // Calculer le nouveau stock
+          const newStock = existingProduct.stock - product.quantity;
+
+          // Mettre à jour le stock dans la base de données
+          await Product.update(
+            { stock: newStock },
+            { where: { id: product.productId } }
+          );
+        }
+      }
     } else {
       return res
         .status(400)
@@ -438,20 +504,44 @@ export const getAllPayments = async (req, res) => {
   }
 
   try {
-    // Récupérer les paiements associés à l'ID utilisateur
-    const paiements = await Paiements.findAll({});
+    // Récupérer tous les paiements
+    const paiements = await Paiements.findAll();
 
     // Si aucun paiement n'est trouvé
     if (!paiements || paiements.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "Aucun paiement trouvé pour cet utilisateur." });
+      return res.status(404).json({ message: "Aucun paiement trouvé." });
     }
+
+    // Récupérer les informations des utilisateurs pour chaque paiement
+    const paiementsWithUserInfo = await Promise.all(
+      paiements.map(async (paiement) => {
+        const user = await User.findOne({ where: { id: paiement.userId } });
+        return {
+          ...paiement.toJSON(),
+          user: user
+            ? {
+                id: user.id,
+                nom: user.nom,
+                prenom: user.prenom,
+                pseudo: user.pseudo,
+                email: user.email,
+                telephone: user.telephone,
+                adresse: user.adresse,
+                ville: user.ville,
+                codePostale: user.codePostale,
+                pays: user.pays,
+                admin: user.admin,
+                temp: user.temp,
+              }
+            : null,
+        };
+      })
+    );
 
     // Répondre avec les paiements trouvés
     return res.status(200).json({
       message: "Paiements récupérés avec succès",
-      paiements,
+      paiements: paiementsWithUserInfo,
     });
   } catch (error) {
     console.error("Erreur lors de la récupération des paiements :", error);
@@ -460,4 +550,67 @@ export const getAllPayments = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+export const validatePaymentInfo = async (req, res) => {
+  const { nom, prenom, email, adresse, telephone, ville, codePostal, pays } =
+    req.body;
+  const token = req.headers.authorization?.split(" ")[1];
+
+  // Vérification des champs obligatoires
+  if (
+    !nom ||
+    !prenom ||
+    !email ||
+    !adresse ||
+    !ville ||
+    !codePostal ||
+    !pays ||
+    !telephone
+  ) {
+    return res
+      .status(400)
+      .json({ message: "Tous les champs sont obligatoires." });
+  }
+
+  // Validation de l'email
+  if (!validator.isEmail(email)) {
+    return res
+      .status(400)
+      .json({ message: "L'email fourni n'est pas valide." });
+  }
+
+  // Création de l'utilisateur avec pseudo et password à null
+  const newUser = await User.create({
+    nom: nom,
+    prenom: prenom,
+    pseudo: null, // Permettre que pseudo soit null
+    email: email,
+    password: null, // Permettre que password soit null
+    telephone: telephone,
+    adresse: adresse,
+    ville: ville,
+    codePostale: codePostal,
+    pays: pays,
+    admin: 0,
+    temp: 1, // Vous pouvez définir temp à 1 ou false selon votre logique
+  });
+
+  // Si le token n'est pas fourni, en générer un nouveau
+  if (!token) {
+    const newToken = generateTokenNotConnect({
+      userId: newUser.id, // Passer l'ID de l'utilisateur
+      admin: newUser.admin, // Passer le statut admin
+    });
+    return res.status(200).json({
+      message:
+        "Informations validées avec succès, un nouveau token a été généré.",
+      token: newToken,
+      newUser,
+    });
+  }
+
+  return res
+    .status(200)
+    .json({ message: "Informations validées avec succès." });
 };

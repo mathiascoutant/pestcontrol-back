@@ -28,16 +28,13 @@ const User = sequelize.define(
     },
     pseudo: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       unique: true,
-      validate: {
-        notEmpty: { msg: "Le nom d'utilisateur est requis" },
-      },
     },
     email: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: false,
       validate: {
         isEmail: { msg: "L'adresse email n'est pas valide" },
         notEmpty: { msg: "L'adresse email est requise" },
@@ -45,7 +42,7 @@ const User = sequelize.define(
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       validate: {
         len: {
           args: [6, 100],
@@ -75,6 +72,10 @@ const User = sequelize.define(
     },
     pays: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    temp: {
+      type: DataTypes.BOOLEAN,
       allowNull: true,
     },
   },

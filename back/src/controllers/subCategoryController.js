@@ -10,6 +10,7 @@ import multer from "multer";
 import { MEDIA_CONFIG } from "../config/mediaConfig.js";
 
 import { createSubCategory } from "../services/subCategoryService.js";
+import Product from "../models/productModel.js";
 
 const storage = multer.memoryStorage();
 const uploadMiddleware = multer({
@@ -279,6 +280,95 @@ export const deleteSubCategory = async (req, res) => {
     console.error("Erreur lors de la suppression de la sous-catégorie:", error);
     return res.status(500).json({
       message: "Erreur lors de la suppression de la sous-catégorie",
+      error: error.message,
+    });
+  }
+};
+
+export const getProductsBySubCategory = async (req, res) => {
+  try {
+    const subCategoryId = req.params.id;
+
+    // Vérifier si l'ID de la sous-catégorie est fourni
+    if (!subCategoryId) {
+      return res.status(400).json({
+        message: "L'ID de la sous-catégorie est requis",
+      });
+    }
+
+    // Vérifier si la sous-catégorie existe et est active
+    const subCategory = await SubCategory.findOne({
+      where: {
+        id: subCategoryId,
+        status: 1, // Uniquement les sous-catégories actives
+      },
+    });
+
+    if (!subCategory) {
+      return res.status(404).json({
+        message: "Sous-catégorie non trouvée ou inactive",
+      });
+    }
+
+    // Récupérer tous les produits actifs appartenant à cette sous-catégorie
+    const products = await Product.findAll({
+      where: {
+        subCategoryId: subCategoryId,
+        status: 1, // Uniquement les produits actifs
+      },
+      attributes: [
+        "id",
+        "nom",
+        "description",
+        "conseilsUtilisation",
+        "stock",
+        "status",
+        "prix",
+        "favorites",
+        "subCategoryId",
+        "medias",
+      ],
+      order: [
+        ["nom", "ASC"], // Trier par nom dans l'ordre alphabétique
+      ],
+    });
+
+    // Si aucun produit n'est trouvé
+    if (!products || products.length === 0) {
+      return res.status(404).json({
+        message: "Aucun produit actif trouvé pour cette sous-catégorie",
+      });
+    }
+
+    // Formater la réponse
+    const formattedProducts = products.map((product) => ({
+      id: product.id,
+      nom: product.nom,
+      description: product.description,
+      conseilsUtilisation: product.conseilsUtilisation,
+      stock: product.stock,
+      status: product.status,
+      prix: product.prix,
+      favorites: product.favorites,
+      subCategoryId: product.subCategoryId,
+      medias: product.medias,
+    }));
+
+    return res.status(200).json({
+      message: "Produits actifs récupérés avec succès",
+      count: formattedProducts.length,
+      subCategory: {
+        id: subCategory.id,
+        name: subCategory.name,
+        description: subCategory.description,
+        picture: subCategory.picture,
+      },
+      products: formattedProducts,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des produits:", error);
+    return res.status(500).json({
+      message: "Erreur lors de la récupération des produits",
       error: error.message,
     });
   }

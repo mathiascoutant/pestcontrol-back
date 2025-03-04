@@ -1,37 +1,29 @@
 import { verifyToken } from "../utils/jwtUtils.js";
 import DiscountShopping from "../models/discountShoppingModel.js";
 import { Op } from "sequelize";
+import { DateTime } from "luxon";
 
 export const addDiscountCode = async (req, res) => {
   try {
-    // Vérification du token
     const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Token manquant" });
+    }
+
     const verified = verifyToken(token);
-
-    if (!verified) {
-      return res.status(401).json({ message: "Token invalide ou manquant" });
+    if (!verified || verified.admin !== 1) {
+      return res.status(403).json({ message: "Accès non autorisé" });
     }
 
-    // Vérification des droits admin
-    if (verified.admin != 1) {
-      return res.status(403).json({
-        message: "Vous n'avez pas l'autorisation pour créer un code promo",
-      });
-    }
-
-    // Récupération des données du body
     const {
       code,
       discount,
       startDate,
       endDate,
-      unique,
       multiUsage,
       nbrAutorisationUsage,
       fonction,
     } = req.body;
-
-    // Vérification de la présence de tous les champs requis
     if (
       !code ||
       !discount ||
@@ -40,110 +32,60 @@ export const addDiscountCode = async (req, res) => {
       typeof multiUsage === "undefined" ||
       !fonction
     ) {
-      return res.status(400).json({
-        message:
-          "Tous les champs sont obligatoires (code, discount, startDate, endDate, unique, fonction)",
-      });
+      return res
+        .status(400)
+        .json({ message: "Tous les champs obligatoires ne sont pas fournis" });
     }
 
-    // Validation du pourcentage de réduction
     const discountValue = parseFloat(discount);
     if (isNaN(discountValue) || discountValue <= 0 || discountValue > 100) {
-      return res.status(400).json({
-        message:
-          "Le pourcentage de réduction doit être un nombre entre 0 et 100",
-      });
+      return res.status(400).json({ message: "Réduction invalide" });
     }
 
-    // Définir nbrAutorisationUsage en fonction de multiUsage
-    const usageCount = multiUsage ? nbrAutorisationUsage : 1;
-
-    // Validation de nbrAutorisationUsage si unique est false
-    if (
-      !unique &&
-      (nbrAutorisationUsage === undefined ||
-        !Number.isInteger(nbrAutorisationUsage) ||
-        nbrAutorisationUsage <= 0)
-    ) {
-      return res.status(400).json({
-        message:
-          "nbrAutorisationUsage doit être un entier supérieur à 0 si le code n'est pas unique",
-      });
-    }
-
-    // Validation des dates
     const start = new Date(startDate);
     const end = new Date(endDate);
     const now = new Date();
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return res.status(400).json({
-        message: "Les dates fournies ne sont pas valides",
-      });
+      return res.status(400).json({ message: "Dates invalides" });
     }
-
     if (start >= end) {
       return res.status(400).json({
-        message: "La date de début doit être antérieure à la date de fin",
+        message: "Date de début postérieure ou égale à la date de fin",
       });
     }
-
     if (start < now) {
-      return res.status(400).json({
-        message: "La date de début ne peut pas être dans le passé",
-      });
+      return res.status(400).json({ message: "Date de début dans le passé" });
     }
 
-    // Vérification si le code promo existe déjà
-    const existingCode = await DiscountShopping.findOne({
-      where: { code },
-    });
-
+    const existingCode = await DiscountShopping.findOne({ where: { code } });
     if (existingCode) {
-      return res.status(400).json({
-        message: "Ce code promo existe déjà",
-      });
+      return res.status(400).json({ message: "Code promo déjà existant" });
     }
 
     if (fonction !== "%" && fonction !== "€") {
-      return res.status(400).json({
-        message: "La fonction doit être soit '%' soit '€'",
-      });
+      return res.status(400).json({ message: "Fonction invalide" });
     }
 
-    // Création du code promo
     const newDiscountCode = await DiscountShopping.create({
       code,
       discount: discountValue,
       startDate: start,
       endDate: end,
       multiUsage,
-      nbrAutorisationUsage: usageCount,
+      nbrAutorisationUsage: multiUsage ? nbrAutorisationUsage : 1,
       nbrUsed: 0,
       fonction,
     });
 
-    return res.status(201).json({
-      message: "Code promo créé avec succès",
-      discountCode: {
-        id: newDiscountCode.id,
-        code: newDiscountCode.code,
-        discount: newDiscountCode.discount,
-        multiUsage: newDiscountCode.multiUsage,
-        nbrAutorisationUsage: newDiscountCode.nbrAutorisationUsage,
-        nbrUsed: newDiscountCode.nbrUsed,
-        fonction: newDiscountCode.fonction,
-        startDate: newDiscountCode.startDate,
-        endDate: newDiscountCode.endDate,
-        createdAt: newDiscountCode.createdAt,
-      },
-    });
+    return res
+      .status(201)
+      .json({ message: "Code promo créé", discountCode: newDiscountCode });
   } catch (error) {
-    console.error("Erreur lors de la création du code promo:", error);
-    return res.status(500).json({
-      message: "Erreur lors de la création du code promo",
-      error: error.message,
-    });
+    console.error("Erreur addDiscountCode:", error);
+    return res
+      .status(500)
+      .json({ message: "Erreur interne", error: error.message });
   }
 };
 
@@ -247,32 +189,37 @@ export const getAllDiscountCodes = async (req, res) => {
 export const verifyDiscountCode = async (req, res) => {
   try {
     const code = req.params.code;
-
     if (!code) {
       return res.status(400).json({
         message: "Le code promo est requis",
+        valid: false,
       });
     }
 
-    const currentDate = new Date();
+    // Convertir la date actuelle en CET
+    const currentDate = DateTime.now().setZone("Europe/Paris").toJSDate();
 
     // Rechercher le code promo actif
     const discountCode = await DiscountShopping.findOne({
       where: {
         code: code,
-        startDate: {
-          [Op.lte]: currentDate, // Date de début inférieure ou égale à maintenant
-        },
-        endDate: {
-          [Op.gte]: currentDate, // Date de fin supérieure ou égale à maintenant
-        },
+        startDate: { [Op.lte]: currentDate },
+        endDate: { [Op.gte]: currentDate },
       },
-      attributes: ["id", "code", "discount", "startDate", "endDate"],
+      attributes: [
+        "id",
+        "code",
+        "discount",
+        "startDate",
+        "endDate",
+        "multiUsage",
+        "nbrAutorisationUsage",
+        "nbrUsed",
+        "fonction",
+      ],
     });
 
-    // Si aucun code promo valide n'est trouvé
     if (!discountCode) {
-      // Vérifier si le code existe mais n'est pas actif
       const existingCode = await DiscountShopping.findOne({
         where: { code },
         attributes: ["startDate", "endDate"],
@@ -300,9 +247,19 @@ export const verifyDiscountCode = async (req, res) => {
           endDate: existingCode.endDate,
         });
       }
+      return;
     }
 
-    // Code promo valide
+    if (
+      !discountCode.multiUsage &&
+      discountCode.nbrUsed >= discountCode.nbrAutorisationUsage
+    ) {
+      return res.status(400).json({
+        message: "Ce code promo a atteint sa limite d'utilisation",
+        valid: false,
+      });
+    }
+
     return res.status(200).json({
       message: "Code promo valide",
       valid: true,
@@ -312,6 +269,10 @@ export const verifyDiscountCode = async (req, res) => {
         discount: discountCode.discount,
         startDate: discountCode.startDate,
         endDate: discountCode.endDate,
+        multiUsage: discountCode.multiUsage,
+        nbrAutorisationUsage: discountCode.nbrAutorisationUsage,
+        nbrUsed: discountCode.nbrUsed,
+        fonction: discountCode.fonction,
       },
     });
   } catch (error) {
