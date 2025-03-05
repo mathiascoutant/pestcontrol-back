@@ -12,7 +12,7 @@ import paymentRoutes from "./src/routes/paymentRoutes.js";
 import discountShoppingRoutes from "./src/routes/discountShoppingRoutes.js";
 import contactMailRoutes from "./src/routes/contactMailRoutes.js";
 import forgetPasswordRoutes from "./src/routes/forgetPasswordRoutes.js";
-
+import countryRoutes from "./src/routes/countryTransportRoutes.js";
 const app = express();
 
 // Connexion à la base de données
@@ -33,7 +33,6 @@ const api = "api/v1";
 // Middleware pour parser le JSON
 app.use(express.json());
 
-
 // Utilisation des routes
 app.use(`/${api}/auth`, authRoutes);
 app.use(`/${api}/users`, userRoutes);
@@ -46,6 +45,7 @@ app.use(`/${api}/subCategories`, subCategoriesRoutes);
 app.use(`/${api}/payments`, paymentRoutes);
 app.use(`/${api}/contact`, contactMailRoutes);
 app.use(`/${api}/forgetpassword`, forgetPasswordRoutes);
+app.use(`/${api}/countries`, countryRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res) => {
