@@ -8,6 +8,7 @@ import User from "../models/userModel.js";
 import Product from "../models/productModel.js";
 import nodemailer from "nodemailer";
 import validator from "validator";
+import { createShipment } from "./transportController.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,7 +28,7 @@ export const sendInvoiceEmail = async (
   userEmail,
   invoiceUrl,
   invoiceNumber,
-  res
+  res = null
 ) => {
   try {
     const transporter = nodemailer.createTransport({
@@ -65,13 +66,34 @@ export const sendInvoiceEmail = async (
     };
 
     await transporter.sendMail(mailOptions);
-    return res.status(200).json({ message: "Facture envoyée avec succès" });
+    console.log(`Email de facture envoyé à ${userEmail}`);
+
+    // Vérifier si res existe et a la méthode json avant de l'utiliser
+    if (
+      res &&
+      typeof res.status === "function" &&
+      typeof res.json === "function"
+    ) {
+      return res.status(200).json({ message: "Facture envoyée avec succès" });
+    }
+
+    return true;
   } catch (error) {
     console.error("Erreur lors de l'envoi de l'email:", error);
-    return res.status(500).json({
-      message: "Erreur lors de l'envoi de l'e-mail",
-      error: error.message,
-    });
+
+    // Vérifier si res existe et a la méthode json avant de l'utiliser
+    if (
+      res &&
+      typeof res.status === "function" &&
+      typeof res.json === "function"
+    ) {
+      return res.status(500).json({
+        message: "Erreur lors de l'envoi de l'e-mail",
+        error: error.message,
+      });
+    }
+
+    throw error; // Propager l'erreur pour la gestion en amont
   }
 };
 
@@ -293,7 +315,7 @@ export const simulatePurchase = async (req, res) => {
 
     if (paidInvoice.status === "paid") {
       // Sauvegarder le paiement en base de données
-      await Paiements.create({
+      const newPayment = await Paiements.create({
         userId,
         products: JSON.stringify(productDetails),
         totalPrice: totalAmount / 100,
@@ -305,16 +327,8 @@ export const simulatePurchase = async (req, res) => {
         reductionFunction,
         reductionAmount,
         fraisTransport: fraisTransport,
+        shippingStatus: "pending", // Statut initial de l'expédition
       });
-
-      // Envoi de l'email
-      await sendInvoiceEmail(
-        totalAmount,
-        email,
-        paidInvoice.hosted_invoice_url,
-        finalizedInvoice.number,
-        res
-      );
 
       // Mettre à jour le stock des produits
       for (const product of products) {
@@ -332,6 +346,126 @@ export const simulatePurchase = async (req, res) => {
             { where: { id: product.productId } }
           );
         }
+      }
+
+      // Vérifier si l'utilisateur a toutes les informations d'adresse nécessaires
+      const user = await User.findByPk(userId);
+      const hasCompleteAddress =
+        user &&
+        user.adresse &&
+        user.ville &&
+        user.codePostale &&
+        user.pays &&
+        user.telephone;
+
+      // Envoi de l'email de confirmation de paiement
+      try {
+        await sendInvoiceEmail(
+          totalAmount,
+          email,
+          paidInvoice.hosted_invoice_url,
+          finalizedInvoice.number
+        );
+        console.log("Email de facture envoyé avec succès");
+      } catch (emailError) {
+        console.error(
+          "Erreur lors de l'envoi de l'email de facture:",
+          emailError
+        );
+        // Continuer le processus même si l'email échoue
+      }
+
+      // Si l'utilisateur n'a pas d'adresse complète, ne pas tenter l'expédition
+      if (!hasCompleteAddress) {
+        console.log(
+          `Utilisateur ${userId} a des informations d'adresse incomplètes, expédition impossible`
+        );
+        return res.status(200).json({
+          message:
+            "Paiement traité avec succès, mais informations d'adresse incomplètes pour l'expédition",
+          payment: {
+            id: newPayment.id,
+            amount: totalAmount / 100,
+            invoice: paidInvoice.id,
+            invoiceUrl: paidInvoice.hosted_invoice_url,
+          },
+          shippingError:
+            "Informations d'adresse incomplètes. Veuillez mettre à jour votre profil dans la section 'Mon compte'.",
+        });
+      }
+
+      // Créer l'expédition Chronopost immédiatement après le paiement
+      try {
+        console.log(
+          "Création de l'expédition pour le paiement ID:",
+          newPayment.id
+        );
+        const shipmentResult = await createShipment(newPayment.id);
+
+        if (shipmentResult.success) {
+          console.log(
+            `Expédition créée avec succès: ${shipmentResult.trackingNumber}`
+          );
+
+          // Vérifier si c'est une expédition de secours
+          const isBackupShipment = shipmentResult.isBackup === true;
+          const shipmentMessage = isBackupShipment
+            ? "Paiement traité avec succès. Votre commande a été enregistrée et sera expédiée prochainement."
+            : "Paiement et expédition traités avec succès";
+
+          // Retourner la réponse avec les informations de paiement et d'expédition
+          return res.status(200).json({
+            message: shipmentMessage,
+            payment: {
+              id: newPayment.id,
+              amount: totalAmount / 100,
+              invoice: paidInvoice.id,
+              invoiceUrl: paidInvoice.hosted_invoice_url,
+            },
+            shipping: {
+              trackingNumber: shipmentResult.trackingNumber,
+              estimatedDeliveryDate: shipmentResult.estimatedDeliveryDate,
+              labelUrl: shipmentResult.labelUrl,
+            },
+          });
+        } else {
+          console.error(
+            `Erreur lors de la création de l'expédition: ${shipmentResult.error}`
+          );
+
+          // Même si l'expédition échoue, le paiement a réussi
+          return res.status(200).json({
+            message:
+              "Paiement traité avec succès. Votre commande a été enregistrée et sera expédiée prochainement.",
+            payment: {
+              id: newPayment.id,
+              amount: totalAmount / 100,
+              invoice: paidInvoice.id,
+              invoiceUrl: paidInvoice.hosted_invoice_url,
+            },
+            shippingInfo:
+              "Notre équipe traitera votre expédition dans les plus brefs délais.",
+          });
+        }
+      } catch (shipmentError) {
+        console.error(
+          "Erreur lors de la création de l'expédition:",
+          shipmentError
+        );
+
+        // Même si l'expédition échoue, le paiement a réussi
+        return res.status(200).json({
+          message:
+            "Paiement traité avec succès. Votre commande a été enregistrée et sera expédiée prochainement.",
+          payment: {
+            id: newPayment.id,
+            amount: totalAmount / 100,
+            invoice: paidInvoice.id,
+            invoiceUrl: paidInvoice.hosted_invoice_url,
+          },
+          shippingInfo:
+            "Notre équipe traitera votre expédition dans les plus brefs délais.",
+        });
       }
     } else {
       return res

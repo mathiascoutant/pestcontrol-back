@@ -46,12 +46,17 @@ const Paiements = sequelize.define(
       allowNull: false,
     },
     reductionAmount: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
+      type: DataTypes.FLOAT,
+      allowNull: true,
     },
     fraisTransport: {
-      type: DataTypes.STRING(255),
+      type: DataTypes.FLOAT,
       allowNull: false,
+    },
+    trackingNumber: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: "Numéro de suivi Chronopost",
     },
   },
   {

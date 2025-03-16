@@ -59,3 +59,21 @@ export const deleteDiscount = async (discountId) => {
   await Discount.destroy({ where: { id: discountId } });
   return { message: "Discount supprimé avec succès." };
 };
+
+/**
+ * Récupère toutes les réductions pour un produit spécifique
+ * @param {number} productId - L'ID du produit
+ * @returns {Promise<Array>} - Liste des réductions pour ce produit
+ */
+export const getDiscountsByProductId = async (productId) => {
+  try {
+    const discounts = await Discount.findAll({
+      where: { productId: productId },
+    });
+    return discounts;
+  } catch (error) {
+    throw new Error(
+      `Erreur lors de la récupération des réductions: ${error.message}`
+    );
+  }
+};
