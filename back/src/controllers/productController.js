@@ -23,6 +23,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { getSubCategoryById } from "../services/subCategoryService.js";
+import { Router } from "express";
 
 const storage = multer.memoryStorage();
 const uploadMiddleware = multer({
@@ -46,6 +47,8 @@ const unlink = promisify(fs.unlink);
 const exists = promisify(fs.exists);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const router = Router();
 
 export const handleUpload = (req, res, next) => {
   uploadMiddleware.any()(req, res, (err) => {
@@ -341,7 +344,7 @@ export const fetchProduct = async (req, res) => {
   }
 };
 
-export const updateProduct = async (req, res) => {
+export const updateProductHandler = async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   const verified = verifyToken(token);
   if (!verified) {
@@ -349,26 +352,255 @@ export const updateProduct = async (req, res) => {
   }
   if (verified.admin != 1) {
     return res.status(403).json({
-      message: "Vous n'avez pas l'autorisation pour créer un atricle",
+      message: "Vous n'avez pas l'autorisation pour modifier un produit",
     });
   }
 
   try {
     const productId = req.params.id;
-    const { nom, description, stock, status, prix } = req.body;
-
-    const existingProduct = await getProductById(productId);
-    if (!existingProduct) {
-      return res.status(404).json({ message: "Produit non trouvé" });
-    }
-
-    const updatedProduct = await updateProductService(productId, {
+    const {
       nom,
       description,
       stock,
       status,
       prix,
+      conseilsUtilisation,
+      subCategoryId,
+    } = req.body;
+
+    // Vérifier que les champs obligatoires ne sont pas vides
+    if (!nom || nom.trim() === "") {
+      return res
+        .status(400)
+        .json({ message: "Le nom du produit est obligatoire." });
+    }
+
+    if (!description || description.trim() === "") {
+      return res
+        .status(400)
+        .json({ message: "La description du produit est obligatoire." });
+    }
+
+    if (!conseilsUtilisation || conseilsUtilisation.trim() === "") {
+      return res
+        .status(400)
+        .json({ message: "Les conseils d'utilisation sont obligatoires." });
+    }
+
+    // Vérifier que le stock est un entier positif
+    const stockValue = String(stock).replace(",", "."); // Remplacer la virgule par un point pour gérer les formats européens
+    const stockNumber = parseInt(stockValue);
+    if (
+      isNaN(stockNumber) ||
+      stockNumber < 0 ||
+      stockNumber !== parseFloat(stockValue) // Vérifie si le nombre a une partie décimale
+    ) {
+      return res.status(400).json({
+        message:
+          "Le stock doit être un entier positif ou nul (pas de décimales).",
+      });
+    }
+
+    // Vérifier que le statut est 0 ou 1
+    if (status !== 0 && status !== 1 && status !== "0" && status !== "1") {
+      return res.status(400).json({ message: "Le statut doit être 0 ou 1." });
+    }
+
+    // Vérifier que le prix est un nombre positif
+    const prixNumber = parseFloat(prix);
+    if (isNaN(prixNumber) || prixNumber <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Le prix doit être un nombre positif." });
+    }
+
+    // Vérifier que la sous-catégorie existe si elle est fournie
+    if (subCategoryId) {
+      const subCategory = await getSubCategoryById(subCategoryId);
+      if (!subCategory) {
+        return res.status(404).json({ message: "Sous-catégorie non trouvée." });
+      }
+    }
+
+    const existingProduct = await Product.findByPk(productId);
+    if (!existingProduct) {
+      return res.status(404).json({ message: "Produit non trouvé" });
+    }
+
+    // Vérifier si le nom existe déjà pour un autre produit
+    if (nom !== existingProduct.nom) {
+      const productWithSameName = await Product.findOne({
+        where: {
+          nom: nom,
+          id: { [Op.ne]: productId }, // Exclure le produit actuel
+        },
+      });
+
+      if (productWithSameName) {
+        return res
+          .status(400)
+          .json({ message: "Un produit avec ce nom existe déjà." });
+      }
+    }
+
+    // Logs pour déboguer
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file, index) => {});
+    }
+
+    // Vérifier s'il y a des fichiers à traiter
+    const hasFiles = req.files && req.files.length > 0;
+
+    // Si des fichiers sont fournis, vérifier qu'il y a au moins une image
+    if (hasFiles) {
+      const imageFiles = req.files.filter((file) =>
+        file.mimetype.startsWith("image/")
+      );
+      const videoFiles = req.files.filter((file) =>
+        file.mimetype.startsWith("video/")
+      );
+
+      if (imageFiles.length === 0 && videoFiles.length === 0) {
+        return res.status(400).json({
+          message: "Vous devez fournir au moins une image ou une vidéo.",
+        });
+      }
+    }
+
+    // Mettre à jour les informations de base du produit
+    const updatedProductData = {
+      nom,
+      description,
+      stock: stockNumber,
+      status: parseInt(status),
+      prix: prixNumber,
+      conseilsUtilisation,
+      subCategoryId,
+    };
+
+    // Si des fichiers sont fournis, gérer les médias
+    if (hasFiles) {
+      try {
+        // Récupérer les médias existants
+        const existingMedias = existingProduct.medias || {
+          imageUrls: [],
+          videoUrls: [],
+        };
+
+        const allExistingMediaUrls = [
+          ...existingMedias.imageUrls,
+          ...existingMedias.videoUrls,
+        ];
+
+        // Se connecter au SFTP
+        await connectSFTP();
+
+        // Supprimer tous les fichiers existants
+        for (const mediaUrl of allExistingMediaUrls) {
+          try {
+            const filename = mediaUrl.split("/").pop();
+            const mediaType = mediaUrl.includes("/images/")
+              ? "images"
+              : "videos";
+            const filePath = `/var/www/medias/${mediaType}/products/${filename}`;
+
+            const deleteResult = await deleteFileToVPS(filePath);
+            if (deleteResult.success) {
+              console.log(`Fichier supprimé avec succès: ${filePath}`);
+            } else {
+              console.error(
+                `Erreur lors de la suppression du fichier ${filePath}:`,
+                deleteResult.message
+              );
+            }
+          } catch (err) {
+            console.error(
+              `Erreur lors de la suppression du fichier ${mediaUrl}:`,
+              err
+            );
+          }
+        }
+
+        // Préparer les nouveaux médias
+        const mediaUrls = {
+          imageUrls: [],
+          videoUrls: [],
+        };
+
+        // Uploader les nouveaux fichiers
+        for (let i = 0; i < req.files.length; i++) {
+          const mediaFile = req.files[i];
+          let mediaType = mediaFile.mimetype.startsWith("image/")
+            ? "images"
+            : "videos";
+
+          const mediaResult = await uploadFileToVPS(
+            mediaFile,
+            productId,
+            i + 1,
+            mediaType,
+            "products"
+          );
+
+          if (mediaResult.success) {
+            const baseUrl = `https://pestcontrol33.com/medias/${mediaType}/products`;
+            const fullUrl = `${baseUrl}/${mediaResult.filename}`;
+
+            if (mediaType === "images") {
+              mediaUrls.imageUrls.push(fullUrl);
+            } else if (mediaType === "videos") {
+              mediaUrls.videoUrls.push(fullUrl);
+            }
+          } else {
+            console.error(
+              "Erreur lors de l'upload du fichier :",
+              mediaResult.message
+            );
+          }
+        }
+
+        // Mettre à jour les médias dans les données du produit
+        updatedProductData.medias = mediaUrls;
+
+        // Déconnecter du SFTP
+        await disconnectSFTP();
+      } catch (error) {
+        console.error("Erreur lors de la gestion des médias:", error);
+        await disconnectSFTP();
+        return res.status(500).json({
+          message: "Erreur lors de la gestion des médias",
+          error: error.message,
+        });
+      }
+    }
+
+    // Mettre à jour le produit dans la base de données
+    await existingProduct.update(updatedProductData);
+
+    // Vérifier s'il existe des réductions actives pour ce produit
+    const activeDiscounts = await Discount.findAll({
+      where: {
+        productId: productId,
+        endDate: { [Op.gte]: new Date() },
+      },
     });
+
+    // Si le prix a été modifié et qu'il existe des réductions actives, recalculer les prix réduits
+    if (prix && activeDiscounts.length > 0) {
+      for (const discount of activeDiscounts) {
+        // Calculer le nouveau prix réduit basé sur le pourcentage de réduction et le nouveau prix de base
+        const newBasePrice = parseFloat(prix);
+        const discountPercentage = discount.discount;
+        const discountAmount = newBasePrice * (discountPercentage / 100);
+        const newDiscountedPrice = newBasePrice - discountAmount;
+
+        // Mettre à jour le prix réduit dans la base de données
+        await discount.update({ newPrice: newDiscountedPrice });
+      }
+    }
+
+    // Récupérer le produit mis à jour pour la réponse
+    const updatedProduct = await Product.findByPk(productId);
 
     return res.status(200).json({
       message: "Produit mis à jour avec succès",
@@ -382,6 +614,8 @@ export const updateProduct = async (req, res) => {
     });
   }
 };
+
+export const updateProduct = [handleUpload, updateProductHandler];
 
 export const deleteProduct = async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
